@@ -51,11 +51,11 @@ interface Vehicle {
 type FilterTab = 'pending' | 'approved' | 'waiting' | 'done' | 'all';
 
 const FILTER_TABS: { key: FilterTab; label: string; statuses: BookingStatus[] }[] = [
-  { key: 'pending', label: 'Cho duyet', statuses: ['cho_duyet', 'cho_duyet_cap2', 'cho_duyet_cap3'] },
-  { key: 'approved', label: 'Da duyet', statuses: ['da_duyet'] },
-  { key: 'waiting', label: 'Cho TX', statuses: ['cho_tx_xac_nhan', 'tx_da_nhan', 'tx_tu_choi'] },
-  { key: 'done', label: 'Hoan thanh', statuses: ['da_hoan_thanh', 'san_sang'] },
-  { key: 'all', label: 'Tat ca', statuses: [] },
+  { key: 'pending', label: 'Chờ duyệt', statuses: ['cho_duyet', 'cho_duyet_cap2', 'cho_duyet_cap3'] },
+  { key: 'approved', label: 'Đã duyệt', statuses: ['da_duyet'] },
+  { key: 'waiting', label: 'Chờ TX', statuses: ['cho_tx_xac_nhan', 'tx_da_nhan', 'tx_tu_choi'] },
+  { key: 'done', label: 'Hoàn thành', statuses: ['da_hoan_thanh', 'san_sang'] },
+  { key: 'all', label: 'Tất cả', statuses: [] },
 ];
 
 interface Props {
@@ -87,35 +87,35 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
   async function handleAction(action: string, data?: Record<string, string>) {
     if (!selectedId) return;
 
-    let result: { success?: boolean; error?: string };
+    let result: { success?: boolean; error?: string; driverName?: string };
 
     switch (action) {
       case 'approve':
         result = await approveBooking(selectedId, userEmail);
-        if (result.success) showToast('Da duyet yeu cau');
+        if (result.success) showToast('Đã duyệt yêu cầu');
         break;
       case 'reject':
         result = await rejectBooking(selectedId, userEmail, data?.reason || '');
-        if (result.success) showToast('Da tu choi yeu cau');
+        if (result.success) showToast('Đã từ chối yêu cầu');
         break;
       case 'assign':
         result = await assignDriverVehicle(selectedId, data?.driverId || '', data?.vehicleId || '');
-        if (result.success) showToast('Da phan cong tai xe');
+        if (result.success) showToast(`Đã phân công ${result.driverName}. Email đã gửi cho tài xế.`);
         break;
       case 'cancel':
-        result = await cancelBooking(selectedId, userEmail, 'Huy boi quan ly');
-        if (result.success) showToast('Da huy chuyen');
+        result = await cancelBooking(selectedId, userEmail, 'Huỷ bởi quản lý');
+        if (result.success) showToast('Đã huỷ chuyến');
         break;
       case 'complete':
         result = await completeTrip(selectedId);
-        if (result.success) showToast('Da hoan thanh chuyen');
+        if (result.success) showToast('Đã hoàn thành chuyến');
         break;
       default:
         return;
     }
 
     if (result.error) {
-      showToast('Loi: ' + result.error);
+      showToast('Lỗi: ' + result.error);
     } else {
       setSelectedId(null);
       startTransition(() => router.refresh());
@@ -124,14 +124,14 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
 
   return (
     <div className="space-y-4">
-      {/* Stats */}
+      {/* Thống kê */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
-          { label: 'Cho duyet', value: stats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
-          { label: 'Da duyet', value: stats.approved, color: 'bg-green-50 text-green-700 border-green-200' },
-          { label: 'Cho TX', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-          { label: 'TX tu choi', value: stats.rejected, color: 'bg-rose-50 text-rose-700 border-rose-200' },
-          { label: 'Hom nay', value: stats.today, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+          { label: 'Chờ duyệt', value: stats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
+          { label: 'Đã duyệt', value: stats.approved, color: 'bg-green-50 text-green-700 border-green-200' },
+          { label: 'Chờ TX xác nhận', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+          { label: 'TX từ chối', value: stats.rejected, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+          { label: 'Hôm nay', value: stats.today, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
         ].map((s) => (
           <div key={s.label} className={`rounded-xl p-3 border ${s.color}`}>
             <div className="text-xl font-bold">{s.value}</div>
@@ -140,7 +140,7 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
         ))}
       </div>
 
-      {/* Filter tabs */}
+      {/* Thanh lọc */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTER_TABS.map((tab) => {
           const count = tab.key === 'all'
@@ -162,19 +162,19 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
         })}
       </div>
 
-      {/* Booking list */}
+      {/* Danh sách yêu cầu */}
       <div className="space-y-2">
         {filtered.map((b) => (
           <BookingCard key={b.id} booking={b} onSelect={setSelectedId} />
         ))}
         {filtered.length === 0 && (
           <div className="text-center py-16 text-slate-400">
-            Khong co yeu cau nao
+            Không có yêu cầu ở bước này
           </div>
         )}
       </div>
 
-      {/* Detail modal */}
+      {/* Chi tiết yêu cầu */}
       {selectedBooking && (
         <BookingDetailModal
           booking={selectedBooking}
@@ -186,9 +186,9 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
         />
       )}
 
-      {/* Toast */}
+      {/* Thông báo */}
       {toast && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium animate-fade-in">
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium">
           {toast}
         </div>
       )}

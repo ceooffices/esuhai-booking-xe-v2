@@ -35,14 +35,14 @@ export function BookingCard({ booking, onSelect }: BookingCardProps) {
       onClick={() => onSelect(b.id)}
       className="bg-white rounded-xl border border-slate-200 p-4 cursor-pointer hover:shadow-md transition-shadow active:bg-slate-50"
     >
-      {/* Header */}
+      {/* Tiêu đề */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-slate-900 truncate">{b.purpose}</h3>
             {b.is_external_vehicle && (
               <span className="text-[10px] px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
-                Xe ngoai
+                Xe ngoài
               </span>
             )}
           </div>
@@ -53,7 +53,7 @@ export function BookingCard({ booking, onSelect }: BookingCardProps) {
         <StatusBadge status={b.status} />
       </div>
 
-      {/* Details */}
+      {/* Chi tiết */}
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
         <div className="flex items-center gap-1.5">
           <Calendar size={14} className="text-slate-400" />
@@ -65,7 +65,7 @@ export function BookingCard({ booking, onSelect }: BookingCardProps) {
         </div>
         <div className="flex items-center gap-1.5">
           <Users size={14} className="text-slate-400" />
-          {b.passenger_count} nguoi
+          {b.passenger_count} người
         </div>
         {b.flight_number && (
           <div className="flex items-center gap-1.5">
@@ -75,7 +75,7 @@ export function BookingCard({ booking, onSelect }: BookingCardProps) {
         )}
       </div>
 
-      {/* Itinerary */}
+      {/* Lịch trình */}
       {b.itinerary && (
         <div className="mt-2 flex items-start gap-1.5 text-sm text-slate-500">
           <MapPin size={14} className="text-slate-400 mt-0.5 shrink-0" />
@@ -83,10 +83,10 @@ export function BookingCard({ booking, onSelect }: BookingCardProps) {
         </div>
       )}
 
-      {/* Driver/Vehicle info */}
+      {/* Thông tin tài xế / xe */}
       {b.driver && (
         <div className="mt-2 pt-2 border-t border-slate-100 text-sm">
-          <span className="text-slate-500">TX:</span>{' '}
+          <span className="text-slate-500">Tài xế:</span>{' '}
           <span className="font-medium text-slate-700">{b.driver.full_name}</span>
           {b.vehicle && (
             <>

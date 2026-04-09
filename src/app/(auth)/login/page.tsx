@@ -24,9 +24,9 @@ export default function LoginPage() {
     });
 
     if (error) {
-      setMessage('Khong gui duoc email. Vui long thu lai.');
+      setMessage('Không gửi được email. Vui lòng thử lại.');
     } else {
-      setMessage('Da gui link dang nhap vao email cua ban!');
+      setMessage('Đã gửi link đăng nhập vào email của anh/chị.');
     }
     setLoading(false);
   }
@@ -36,16 +36,16 @@ export default function LoginPage() {
       <div className="w-full max-w-sm">
         <div className="bg-white rounded-2xl shadow-lg p-8">
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900">Booking Xe</h1>
+            <h1 className="text-2xl font-bold text-slate-900">Quản lý Xe</h1>
             <p className="text-sm text-slate-500 mt-1">
-              Phong Tong Hop — Esuhai Group
+              Phòng Tổng Hợp — Esuhai Group
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-slate-700 mb-1">
-                Email cong ty
+                Email công ty
               </label>
               <input
                 id="email"
@@ -63,13 +63,17 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition"
             >
-              {loading ? 'Dang gui...' : 'Dang nhap bang Email'}
+              {loading ? 'Đang gửi...' : 'Đăng nhập bằng Email'}
             </button>
           </form>
 
           {message && (
             <p className="mt-4 text-center text-sm text-emerald-600">{message}</p>
           )}
+
+          <p className="mt-6 text-center text-xs text-slate-400">
+            Mỗi chuyến xe là một chuyến yêu thương
+          </p>
         </div>
       </div>
     </div>

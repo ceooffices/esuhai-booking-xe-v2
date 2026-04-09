@@ -1,25 +1,25 @@
 // ============================================================
-// Business Constants — Ported from Ver01 gas_project/config.js
+// Business Constants — Theo Content Bible chuẩn
 // ============================================================
 
 import type { BookingStatus } from '@/types/database';
 
-// --- Status Labels (Vietnamese) ---
+// --- Status Labels (theo Content Bible mục III) ---
 export const STATUS_LABELS: Record<BookingStatus, string> = {
-  cho_duyet: 'Cho duyet',
-  cho_duyet_cap2: 'Cho duyet cap 2',
-  cho_duyet_cap3: 'Cho duyet cap 3',
-  da_duyet: 'Da duyet',
-  khong_duyet: 'Khong duyet',
-  cho_tx_xac_nhan: 'Cho TX xac nhan',
-  tx_da_nhan: 'TX da nhan',
-  tx_tu_choi: 'TX tu choi',
-  san_sang: 'San sang',
-  da_hoan_thanh: 'Da hoan thanh',
-  da_huy: 'Da huy',
+  cho_duyet: 'Chờ duyệt',
+  cho_duyet_cap2: 'Chờ duyệt cấp 2',
+  cho_duyet_cap3: 'Chờ duyệt cấp 3',
+  da_duyet: 'Đã duyệt',
+  khong_duyet: 'Không duyệt',
+  cho_tx_xac_nhan: 'Chờ TX xác nhận',
+  tx_da_nhan: 'TX đã nhận',
+  tx_tu_choi: 'TX từ chối',
+  san_sang: 'Sẵn sàng',
+  da_hoan_thanh: 'Đã hoàn thành',
+  da_huy: 'Đã huỷ',
 };
 
-// --- Status Colors (Tailwind classes) ---
+// --- Status Colors (theo Content Bible mục VI) ---
 export const STATUS_COLORS: Record<BookingStatus, string> = {
   cho_duyet: 'bg-yellow-100 text-yellow-800',
   cho_duyet_cap2: 'bg-amber-100 text-amber-800',
@@ -36,33 +36,33 @@ export const STATUS_COLORS: Record<BookingStatus, string> = {
 
 // --- Approval Config ---
 export const APPROVAL_CONFIG = {
-  internal: { levels: 1, label: 'Xe co huu' },
-  external: { levels: 3, label: 'Xe ngoai' },
+  internal: { levels: 1, label: 'Xe cơ hữu' },
+  external: { levels: 3, label: 'Xe ngoài' },
 } as const;
 
-// --- Cost Categories ---
+// --- Loại chi phí ---
 export const COST_CATEGORIES = [
-  { value: 'sua_chua', label: 'Chi phi sua chua' },
-  { value: 'thay_moi', label: 'Chi phi thay moi' },
-  { value: 'cau_duong', label: 'Phi cau duong' },
-  { value: 'do_xe', label: 'Chi phi do xe' },
-  { value: 'xang_dau', label: 'Chi phi xang dau' },
-  { value: 'kiem_dinh', label: 'Chi phi kiem dinh' },
-  { value: 'thue_xe', label: 'Chi phi thue xe' },
-  { value: 'khac', label: 'Chi phi khac' },
+  { value: 'sua_chua', label: 'Chi phí sửa chữa' },
+  { value: 'thay_moi', label: 'Chi phí thay mới' },
+  { value: 'cau_duong', label: 'Phí cầu đường' },
+  { value: 'do_xe', label: 'Chi phí đỗ xe' },
+  { value: 'xang_dau', label: 'Chi phí xăng dầu' },
+  { value: 'kiem_dinh', label: 'Chi phí kiểm định' },
+  { value: 'thue_xe', label: 'Chi phí thuê xe' },
+  { value: 'khac', label: 'Chi phí khác' },
 ] as const;
 
-// --- Evaluation Criteria ---
+// --- Tiêu chí đánh giá ---
 export const EVALUATION_CRITERIA = [
-  { key: 'service_attitude', label: 'Thai do phuc vu' },
-  { key: 'traffic_compliance', label: 'Chap hanh luat giao thong' },
-  { key: 'vehicle_quality', label: 'Chat luong phuong tien' },
-  { key: 'safe_driving', label: 'Lai xe an toan' },
+  { key: 'service_attitude', label: 'Thái độ phục vụ' },
+  { key: 'traffic_compliance', label: 'Chấp hành luật giao thông' },
+  { key: 'vehicle_quality', label: 'Chất lượng phương tiện' },
+  { key: 'safe_driving', label: 'Lái xe an toàn' },
 ] as const;
 
 // --- Email Config ---
 export const EMAIL_CONFIG = {
-  senderName: 'Phong Tong hop - Esuhai',
+  senderName: 'Phòng Tổng Hợp - Esuhai',
   senderEmail: 'booking.xe@esuhai.com',
   alwaysCC: 'hoangkha@esuhai.com',
   delayMs: 500,

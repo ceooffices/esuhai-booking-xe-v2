@@ -80,64 +80,64 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
         onClick={(e) => e.stopPropagation()}
         className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto"
       >
-        {/* Header */}
+        {/* Tiêu đề */}
         <div className="sticky top-0 bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between rounded-t-2xl">
-          <h2 className="text-lg font-bold text-slate-900">Chi tiet yeu cau</h2>
+          <h2 className="text-lg font-bold text-slate-900">Chi tiết yêu cầu</h2>
           <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
             <X size={20} />
           </button>
         </div>
 
         <div className="px-5 py-4 space-y-4">
-          {/* Status */}
+          {/* Trạng thái */}
           <div className="flex items-center gap-2">
             <StatusBadge status={b.status} />
             {b.is_external_vehicle && (
               <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded font-medium">
-                Xe ngoai — {b.max_approval_levels} cap duyet
+                Xe ngoài — {b.max_approval_levels} cấp duyệt
               </span>
             )}
           </div>
 
-          {/* Info grid */}
+          {/* Thông tin chi tiết */}
           <div className="space-y-3">
-            <InfoRow label="Muc dich" value={b.purpose} />
-            <InfoRow label="Nguoi dat" value={`${b.requester_name} — ${b.requester_department}`} />
-            <InfoRow label="Ngay di" value={b.trip_date} />
-            <InfoRow label="Gio" value={`${b.pickup_time}${b.end_time ? ' - ' + b.end_time : ''}`} />
-            <InfoRow label="So luong" value={`${b.passenger_count} nguoi`} />
-            {b.staff_in_charge && <InfoRow label="NV phu trach" value={b.staff_in_charge} />}
-            {b.flight_number && <InfoRow label="Chuyen bay" value={b.flight_number} />}
-            {b.member_names && <InfoRow label="Thanh vien" value={b.member_names} />}
-            {b.itinerary && <InfoRow label="Lich trinh" value={b.itinerary} />}
-            {b.driver && <InfoRow label="Tai xe" value={`${b.driver.full_name} — ${b.driver.phone}`} />}
-            {b.vehicle && <InfoRow label="Xe" value={`${b.vehicle.vehicle_type} — ${b.vehicle.plate_number}`} />}
+            <InfoRow label="Mục đích" value={b.purpose} />
+            <InfoRow label="Người yêu cầu" value={`${b.requester_name} — ${b.requester_department}`} />
+            <InfoRow label="Ngày đi" value={b.trip_date} />
+            <InfoRow label="Giờ đón" value={`${b.pickup_time}${b.end_time ? ' — ' + b.end_time : ''}`} />
+            <InfoRow label="Số lượng" value={`${b.passenger_count} người`} />
+            {b.staff_in_charge && <InfoRow label="NV phụ trách" value={b.staff_in_charge} />}
+            {b.flight_number && <InfoRow label="Chuyến bay" value={b.flight_number} />}
+            {b.member_names && <InfoRow label="Thành viên" value={b.member_names} />}
+            {b.itinerary && <InfoRow label="Lịch trình" value={b.itinerary} />}
+            {b.driver && <InfoRow label="Tài xế phục vụ" value={`${b.driver.full_name} — ${b.driver.phone}`} />}
+            {b.vehicle && <InfoRow label="Xe phục vụ" value={`${b.vehicle.vehicle_type} — ${b.vehicle.plate_number}`} />}
             {b.rejection_reason && (
               <div className="bg-red-50 rounded-lg p-3">
-                <div className="text-xs text-red-500 font-medium">Ly do tu choi</div>
+                <div className="text-xs text-red-500 font-medium">Lý do không duyệt</div>
                 <div className="text-sm text-red-700 mt-1">{b.rejection_reason}</div>
               </div>
             )}
             {b.driver_rejection_reason && (
               <div className="bg-rose-50 rounded-lg p-3">
-                <div className="text-xs text-rose-500 font-medium">TX tu choi</div>
+                <div className="text-xs text-rose-500 font-medium">Lý do tài xế từ chối</div>
                 <div className="text-sm text-rose-700 mt-1">{b.driver_rejection_reason}</div>
               </div>
             )}
           </div>
 
-          {/* Assign mode */}
+          {/* Phân công tài xế và xe */}
           {mode === 'assign' && (
             <div className="space-y-3 pt-2 border-t border-slate-200">
-              <h3 className="font-semibold text-slate-800">Phan cong tai xe va xe</h3>
+              <h3 className="font-semibold text-slate-800">Phân công Tài xế & Xe</h3>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Tai xe</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Chọn tài xế</label>
                 <select
                   value={selectedDriver}
                   onChange={(e) => setSelectedDriver(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="">-- Chon tai xe --</option>
+                  <option value="">-- Chọn tài xế --</option>
                   {drivers.filter(d => d.is_available).map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.full_name} — {d.phone}
@@ -146,46 +146,47 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 mb-1">Xe</label>
+                <label className="block text-sm font-medium text-slate-600 mb-1">Chọn xe</label>
                 <select
                   value={selectedVehicle}
                   onChange={(e) => setSelectedVehicle(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="">-- Chon xe --</option>
+                  <option value="">-- Chọn xe --</option>
                   {vehicles.filter(v => v.is_available).map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.vehicle_type} — {v.plate_number} ({v.seat_count} cho)
+                      {v.vehicle_type} — {v.plate_number} ({v.seat_count} chỗ)
                     </option>
                   ))}
                 </select>
               </div>
+              <p className="text-xs text-slate-400">Tài xế sẽ nhận email thông báo ngay lập tức</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => handleAction('assign', { driverId: selectedDriver, vehicleId: selectedVehicle })}
                   disabled={!selectedDriver || !selectedVehicle || loading}
                   className="flex-1 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition text-sm"
                 >
-                  {loading ? 'Dang xu ly...' : 'Xac nhan phan cong'}
+                  {loading ? 'Đang xử lý...' : 'Xác nhận phân công'}
                 </button>
                 <button
                   onClick={() => setMode('view')}
                   className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-medium hover:bg-slate-200 transition text-sm"
                 >
-                  Huy
+                  Huỷ
                 </button>
               </div>
             </div>
           )}
 
-          {/* Reject mode */}
+          {/* Lý do không duyệt */}
           {mode === 'reject' && (
             <div className="space-y-3 pt-2 border-t border-slate-200">
-              <h3 className="font-semibold text-slate-800">Ly do khong duyet</h3>
+              <h3 className="font-semibold text-slate-800">Lý do không duyệt</h3>
               <textarea
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Nhap ly do tu choi..."
+                placeholder="Vui lòng nhập lý do từ chối..."
                 className="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-red-500 outline-none resize-none h-20"
               />
               <div className="flex gap-2">
@@ -194,19 +195,19 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   disabled={!rejectReason.trim() || loading}
                   className="flex-1 py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 disabled:opacity-50 transition text-sm"
                 >
-                  {loading ? 'Dang xu ly...' : 'Xac nhan tu choi'}
+                  {loading ? 'Đang xử lý...' : 'Xác nhận từ chối'}
                 </button>
                 <button
                   onClick={() => setMode('view')}
                   className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-medium hover:bg-slate-200 transition text-sm"
                 >
-                  Huy
+                  Huỷ
                 </button>
               </div>
             </div>
           )}
 
-          {/* Action buttons */}
+          {/* Nút hành động */}
           {mode === 'view' && (
             <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
               {canApprove && (
@@ -217,14 +218,14 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                     className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 transition text-sm"
                   >
                     <Check size={16} />
-                    {b.max_approval_levels > 1 ? `Duyet cap ${b.current_approval_level}` : 'Duyet'}
+                    {b.max_approval_levels > 1 ? `Duyệt cấp ${b.current_approval_level}` : 'Duyệt'}
                   </button>
                   <button
                     onClick={() => setMode('reject')}
                     className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 transition text-sm"
                   >
                     <XCircle size={16} />
-                    Khong duyet
+                    Không duyệt
                   </button>
                 </>
               )}
@@ -234,7 +235,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition text-sm"
                 >
                   <UserPlus size={16} />
-                  Phan cong TX & Xe
+                  Phân công Tài xế & Xe
                 </button>
               )}
               {canComplete && (
@@ -244,7 +245,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 transition text-sm"
                 >
                   <CheckCircle size={16} />
-                  Hoan thanh
+                  Hoàn thành
                 </button>
               )}
               {canCancel && (
@@ -254,7 +255,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-100 text-slate-600 rounded-lg font-medium hover:bg-slate-200 transition text-sm"
                 >
                   <Ban size={16} />
-                  Huy chuyen
+                  Huỷ chuyến
                 </button>
               )}
             </div>
@@ -268,7 +269,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex gap-3">
-      <span className="text-sm text-slate-400 w-24 shrink-0">{label}</span>
+      <span className="text-sm text-slate-400 w-28 shrink-0">{label}</span>
       <span className="text-sm text-slate-800">{value}</span>
     </div>
   );
