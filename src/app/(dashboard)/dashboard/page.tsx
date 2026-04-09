@@ -18,24 +18,21 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [{ data: drivers }, { data: vehicles }, { data: formConfig }] = await Promise.all([
+  const [{ data: drivers }, { data: vehicles }, { data: staffRows }, { data: formConfig }] = await Promise.all([
     supabase.from('drivers').select('id, full_name, phone, is_available').order('full_name'),
     supabase.from('vehicles').select('id, plate_number, vehicle_type, seat_count, is_available').order('vehicle_type'),
+    admin.from('staff').select('name, department, email, title, is_manager').not('email', 'is', null).order('department').order('name'),
     supabase.from('system_config').select('value').eq('key', 'google_form_url').single(),
   ]);
 
-  // Staff list cho send form modal — query riêng vì bảng staff có thể chưa tồn tại
-  let staffList: { name: string; department: string; email: string }[] = [];
-  try {
-    const { data: staffRows } = await admin.from('staff').select('name, department, email').not('email', 'is', null).order('department, name');
-    staffList = (staffRows || []).map((s: { name: string; department: string; email: string }) => ({
-      name: s.name,
-      department: s.department || '',
-      email: s.email,
-    }));
-  } catch {
-    // Bảng staff chưa tồn tại — bỏ qua
-  }
+  // Staff list cho send form modal + autocomplete tạo yêu cầu
+  const staffList = (staffRows || []).map((s: { name: string; department: string; email: string; title: string | null; is_manager: boolean }) => ({
+    name: s.name,
+    department: s.department || '',
+    email: s.email,
+    title: s.title || '',
+    is_manager: s.is_manager || false,
+  }));
 
   const today = new Date().toISOString().split('T')[0];
   const list = bookings || [];
