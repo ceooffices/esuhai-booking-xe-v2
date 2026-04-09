@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { X, Check, XCircle, UserPlus, Ban, CheckCircle } from 'lucide-react';
 import { StatusBadge } from './status-badge';
+import { ModalOverlay } from '@/components/ui/animations';
 import type { BookingStatus } from '@/types/database';
 
 interface Driver { id: string; full_name: string; phone: string; is_available: boolean; }
@@ -63,11 +64,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl max-h-[92vh] overflow-y-auto"
-      >
+    <ModalOverlay onClose={onClose}>
         {/* Tiêu đề */}
         <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl">
           <h2 className="text-xl font-bold text-slate-900">Chi tiết yêu cầu</h2>
@@ -229,8 +226,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
