@@ -2,7 +2,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email';
-import { buildNewBookingEmail, buildDriverAssignEmail, buildConfirmBookerEmail, buildDriverRejectEmail, buildRejectBookerEmail } from '@/lib/email-templates';
+import { buildNewBookingEmail, buildDriverAssignEmail, buildConfirmBookerEmail, buildDriverRejectEmail, buildRejectBookerEmail, buildCancellationEmail, buildRejectAllEmail } from '@/lib/email-templates';
 import type { BookingStatus } from '@/types/database';
 
 // Helper: lấy booking data cho email template
@@ -63,6 +63,31 @@ async function logEmail(supabase: ReturnType<typeof createAdminClient>, bookingI
   });
 }
 
+// Helper: thu thập TOÀN BỘ thành viên tham gia quy trình
+function collectRecipients(
+  emailData: Awaited<ReturnType<typeof getBookingEmailData>>,
+  config: Record<string, string>
+): { email: string; name: string }[] {
+  if (!emailData) return [];
+  const recipients: { email: string; name: string }[] = [];
+  const seen = new Set<string>();
+
+  function add(email: string | undefined | null, name: string) {
+    if (!email || seen.has(email)) return;
+    seen.add(email);
+    recipients.push({ email, name });
+  }
+
+  // Người yêu cầu
+  add(emailData.requesterEmail, `anh/chị ${emailData.requesterName}`);
+  // Tài xế (nếu đã phân công)
+  add(emailData.driverEmail, `anh ${emailData.driverName}`);
+  // Quản lý
+  add(config.manager_email, 'chị');
+
+  return recipients;
+}
+
 // --- Approve Booking (handles multi-level) ---
 export async function approveBooking(bookingId: string, approverEmail: string) {
   const supabase = createAdminClient();
@@ -121,18 +146,17 @@ export async function rejectBooking(bookingId: string, rejectedBy: string, reaso
 
   if (error) return { error: error.message };
 
-  // Gửi email thông báo không duyệt cho người yêu cầu
+  // Gửi email thông báo không duyệt cho TOÀN BỘ thành viên
   const emailData = await getBookingEmailData(supabase, bookingId);
-  if (emailData?.requesterEmail) {
+  if (emailData) {
     const config = await getEmailConfig(supabase);
-    const tpl = buildRejectBookerEmail({ ...emailData, rejectionReason: reason });
-    const result = await sendEmail({
-      to: emailData.requesterEmail,
-      cc: config.always_cc,
-      subject: tpl.subject,
-      html: tpl.html,
-    });
-    await logEmail(supabase, bookingId, 'reject_booker', emailData.requesterEmail, tpl.subject, result.success, result.error);
+    const recipients = collectRecipients(emailData, config);
+
+    for (const r of recipients) {
+      const tpl = buildRejectAllEmail({ ...emailData, rejectionReason: reason, recipientName: r.name });
+      const result = await sendEmail({ to: r.email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
+      await logEmail(supabase, bookingId, 'reject_all', r.email, tpl.subject, result.success, result.error);
+    }
   }
 
   return { success: true };
@@ -173,9 +197,14 @@ export async function assignDriverVehicle(bookingId: string, driverId: string, v
   return { success: true, driverName: driver.full_name };
 }
 
-// --- Cancel Booking ---
+// --- Cancel Booking (bắt buộc lý do + thông báo toàn bộ) ---
 export async function cancelBooking(bookingId: string, cancelledBy: string, reason: string) {
   const supabase = createAdminClient();
+
+  if (!reason.trim()) return { error: 'Vui lòng nhập lý do huỷ chuyến' };
+
+  // Lấy data trước khi update (cần driver/vehicle info)
+  const emailData = await getBookingEmailData(supabase, bookingId);
 
   const { error } = await supabase.from('bookings').update({
     status: 'da_huy' as BookingStatus,
@@ -184,6 +213,24 @@ export async function cancelBooking(bookingId: string, cancelledBy: string, reas
   }).eq('id', bookingId);
 
   if (error) return { error: error.message };
+
+  // Gửi email huỷ chuyến cho TOÀN BỘ thành viên
+  if (emailData) {
+    const config = await getEmailConfig(supabase);
+    const recipients = collectRecipients(emailData, config);
+
+    for (const r of recipients) {
+      const tpl = buildCancellationEmail({
+        ...emailData,
+        cancelledBy,
+        cancellationReason: reason,
+        recipientName: r.name,
+      });
+      const result = await sendEmail({ to: r.email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
+      await logEmail(supabase, bookingId, 'cancellation', r.email, tpl.subject, result.success, result.error);
+    }
+  }
+
   return { success: true };
 }
 

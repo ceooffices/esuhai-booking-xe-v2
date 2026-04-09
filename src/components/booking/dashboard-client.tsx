@@ -97,8 +97,9 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
         if (result.success) showToast(`Đã phân công ${result.driverName}. Email đã gửi cho tài xế.`);
         break;
       case 'cancel':
-        result = await cancelBooking(selectedId, userEmail, 'Huỷ bởi quản lý');
-        if (result.success) showToast('Đã huỷ chuyến');
+        if (!data?.reason?.trim()) { showToast('Vui lòng nhập lý do huỷ chuyến'); return; }
+        result = await cancelBooking(selectedId, userEmail, data.reason);
+        if (result.success) showToast('Đã huỷ chuyến. Thông báo đã gửi cho toàn bộ thành viên.');
         break;
       case 'complete':
         result = await completeTrip(selectedId);

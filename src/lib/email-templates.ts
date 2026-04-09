@@ -246,3 +246,63 @@ export function buildRejectBookerEmail(d: BookingEmailData): { subject: string; 
 
   return { subject, html: baseWrapper(body) };
 }
+
+// --- Template: Huỷ chuyến → Toàn bộ thành viên ---
+export function buildCancellationEmail(d: BookingEmailData & { cancelledBy: string; cancellationReason: string; recipientName: string }): { subject: string; html: string } {
+  const subject = `[Huỷ chuyến] ${d.purpose} — ${d.tripDate}`;
+
+  const body = `
+    ${headerBlock('Chuyến xe đã được huỷ', 'Phòng Tổng Hợp — Esuhai Group', '#dc2626')}
+    <div style="background:#ffffff;padding:24px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+      <p style="color:#334155;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Kính gửi ${d.recipientName},<br>
+        Chuyến xe bên dưới đã được huỷ. Vui lòng xem lý do chi tiết.
+      </p>
+
+      ${alertBox('Lý do huỷ chuyến', d.cancellationReason, '#fef2f2', '#991b1b', '#fecaca')}
+
+      <table style="width:100%;border-collapse:collapse;">
+        ${infoRow('Mã yêu cầu', '#' + d.bookingId.slice(0, 8).toUpperCase())}
+        ${infoRow('Ngày và giờ', `${d.tripDate} | ${d.pickupTime}`)}
+        ${infoRow('Mục đích', d.purpose)}
+        ${infoRow('Người yêu cầu', `${d.requesterName} — ${d.requesterDepartment}`)}
+        ${d.driverName ? infoRow('Tài xế', d.driverName) : ''}
+        ${d.vehicleType ? infoRow('Xe', `${d.vehicleType}${d.plateNumber ? ' — ' + d.plateNumber : ''}`) : ''}
+        ${d.staffInCharge ? infoRow('NV phụ trách', d.staffInCharge) : ''}
+      </table>
+
+      <div style="margin:16px 0;padding:12px 16px;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;color:#9a3412;font-size:13px;">
+        Người thực hiện huỷ: <strong>${d.cancelledBy}</strong>
+      </div>
+    </div>
+    ${footerNote('Nếu có thắc mắc, vui lòng liên hệ Phòng Tổng Hợp.')}`;
+
+  return { subject, html: baseWrapper(body) };
+}
+
+// --- Template: Không duyệt → Thông báo toàn bộ ---
+export function buildRejectAllEmail(d: BookingEmailData & { recipientName: string }): { subject: string; html: string } {
+  const subject = `[Không duyệt] ${d.purpose} — ${d.tripDate}`;
+
+  const body = `
+    ${headerBlock('Yêu cầu không được duyệt', 'Phòng Tổng Hợp — Esuhai Group', '#64748b')}
+    <div style="background:#ffffff;padding:24px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+      <p style="color:#334155;font-size:16px;line-height:1.6;margin:0 0 20px;">
+        Kính gửi ${d.recipientName},<br>
+        Yêu cầu sử dụng xe bên dưới đã không được phê duyệt.
+      </p>
+
+      ${d.rejectionReason ? alertBox('Lý do không duyệt', d.rejectionReason, '#f8fafc', '#475569', '#e2e8f0') : ''}
+
+      <table style="width:100%;border-collapse:collapse;">
+        ${infoRow('Ngày đi', d.tripDate)}
+        ${infoRow('Giờ đón', d.pickupTime)}
+        ${infoRow('Mục đích', d.purpose)}
+        ${infoRow('Người yêu cầu', `${d.requesterName} — ${d.requesterDepartment}`)}
+        ${d.staffInCharge ? infoRow('NV phụ trách', d.staffInCharge) : ''}
+      </table>
+    </div>
+    ${footerNote('Nếu có thắc mắc, vui lòng liên hệ Phòng Tổng Hợp.')}`;
+
+  return { subject, html: baseWrapper(body) };
+}

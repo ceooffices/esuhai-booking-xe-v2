@@ -45,10 +45,11 @@ interface Props {
 }
 
 export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onClose, onAction }: Props) {
-  const [mode, setMode] = useState<'view' | 'assign' | 'reject'>('view');
+  const [mode, setMode] = useState<'view' | 'assign' | 'reject' | 'cancel'>('view');
   const [selectedDriver, setSelectedDriver] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [rejectReason, setRejectReason] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
   const [loading, setLoading] = useState(false);
   const b = booking;
 
@@ -185,6 +186,30 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
             </div>
           )}
 
+          {/* Huỷ chuyến — bắt buộc lý do */}
+          {mode === 'cancel' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <h3 className="text-lg font-bold text-red-700">Huỷ chuyến xe</h3>
+              <p className="text-sm text-slate-500">
+                Thông báo huỷ sẽ được gửi đến toàn bộ thành viên tham gia quy trình: người yêu cầu, NV phụ trách, tài xế và quản lý.
+              </p>
+              <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Vui lòng nhập lý do huỷ chuyến (bắt buộc)..."
+                className="w-full px-4 py-3 rounded-xl border border-red-300 text-base focus:ring-2 focus:ring-red-500 outline-none resize-none h-28" />
+              <div className="flex gap-3">
+                <button onClick={() => handleAction('cancel', { reason: cancelReason })}
+                  disabled={!cancelReason.trim() || loading}
+                  className="flex-1 py-4 bg-red-600 text-white rounded-xl text-base font-semibold hover:bg-red-700 disabled:opacity-50 transition">
+                  {loading ? 'Đang xử lý...' : 'Xác nhận huỷ chuyến'}
+                </button>
+                <button onClick={() => setMode('view')}
+                  className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl text-base font-semibold hover:bg-slate-200 transition">
+                  Quay lại
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Nút hành động */}
           {mode === 'view' && (
             <div className="space-y-3 pt-4 border-t border-slate-200">
@@ -217,7 +242,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                 </button>
               )}
               {canCancel && (
-                <button onClick={() => handleAction('cancel')} disabled={loading}
+                <button onClick={() => { setCancelReason(''); setMode('cancel'); }}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-slate-100 text-slate-500 rounded-xl text-sm font-medium hover:bg-slate-200 transition">
                   <Ban size={16} />
                   Huỷ chuyến
