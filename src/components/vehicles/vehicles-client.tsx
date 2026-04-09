@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { Plus, Edit2, X, Shield, Wrench, AlertTriangle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { saveVehicle } from '@/lib/actions';
@@ -52,7 +52,11 @@ export function VehiclesClient({ vehicles, inspectionMap, maintenanceMap }: Prop
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+  }, []);
   const router = useRouter();
 
   function openAdd() {
@@ -90,7 +94,8 @@ export function VehiclesClient({ vehicles, inspectionMap, maintenanceMap }: Prop
   }
 
   function isExpiringSoon(expiryDate: string): boolean {
-    const diff = new Date(expiryDate).getTime() - Date.now();
+    if (!now) return false;
+    const diff = new Date(expiryDate).getTime() - now;
     return diff > 0 && diff < 30 * 86400000; // 30 ngày
   }
 

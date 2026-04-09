@@ -42,7 +42,7 @@ export function SettingsClient({ configs }: { configs: Config[] }) {
   );
   const [saving, setSaving] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
   async function handleSave(key: string) {

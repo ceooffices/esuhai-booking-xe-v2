@@ -316,8 +316,17 @@ export async function savePostTripCost(postTripId: string, bookingId: string, da
   cost_category: string; description: string; amount: number;
 }) {
   const supabase = createAdminClient();
+
+  // Tự tìm post_trip_id nếu không truyền
+  let ptId = postTripId;
+  if (!ptId && bookingId) {
+    const { data: pt } = await supabase.from('post_trips').select('id').eq('booking_id', bookingId).single();
+    ptId = pt?.id || '';
+  }
+  if (!ptId) return { error: 'Chưa có bản ghi cập nhật sau chuyến đi' };
+
   const { error } = await supabase.from('post_trip_costs').insert({
-    post_trip_id: postTripId, booking_id: bookingId,
+    post_trip_id: ptId, booking_id: bookingId,
     cost_category: data.cost_category,
     description: data.description || null, amount: data.amount,
   });

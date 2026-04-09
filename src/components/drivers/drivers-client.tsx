@@ -36,7 +36,7 @@ export function DriversClient({ drivers, tripCounts }: Props) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
   function openAdd() {

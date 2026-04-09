@@ -6,7 +6,7 @@ import { BookingCard } from './booking-card';
 import { BookingDetailModal } from './booking-detail-modal';
 import { SendFormModal } from './send-form-modal';
 import { FadeIn, StaggerList, StaggerItem, CountUp, ToastAnimation, PageTransition } from '@/components/ui/animations';
-import { approveBooking, rejectBooking, assignDriverVehicle, cancelBooking, completeTrip } from '@/lib/actions';
+import { approveBooking, rejectBooking, assignDriverVehicle, cancelBooking, completeTrip, savePostTrip, savePostTripCost } from '@/lib/actions';
 import { useRouter } from 'next/navigation';
 import type { BookingStatus } from '@/types/database';
 
@@ -64,7 +64,7 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const router = useRouter();
 
   const filtered = activeTab === 'all'
@@ -76,6 +76,33 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
   function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
+  }
+
+  async function savePostTripAction(bookingId: string, data: Record<string, string>): Promise<{ success?: boolean; error?: string }> {
+    const ptResult = await savePostTrip(bookingId, {
+      actual_departure: data.actual_departure || '',
+      actual_return: data.actual_return || '',
+      total_km: parseFloat(data.total_km) || 0,
+      overnight_hours: parseFloat(data.overnight_hours) || 0,
+    }, userEmail);
+    if (ptResult.error) return ptResult;
+
+    // Save costs
+    if (data.costs) {
+      try {
+        const costs = JSON.parse(data.costs) as { category: string; description: string; amount: string }[];
+        for (const c of costs) {
+          if (parseFloat(c.amount) > 0) {
+            await savePostTripCost('', bookingId, {
+              cost_category: c.category,
+              description: c.description,
+              amount: parseFloat(c.amount),
+            });
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    }
+    return { success: true };
   }
 
   async function handleAction(action: string, data?: Record<string, string>) {
@@ -104,6 +131,10 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
       case 'complete':
         result = await completeTrip(selectedId);
         if (result.success) showToast('Đã hoàn thành chuyến');
+        break;
+      case 'posttrip':
+        result = await savePostTripAction(selectedId, data || {});
+        if (result.success) showToast('Đã lưu cập nhật sau chuyến đi');
         break;
       default:
         return;
@@ -192,7 +223,6 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
           booking={selectedBooking}
           drivers={drivers}
           vehicles={vehicles}
-          userEmail={userEmail}
           onClose={() => setSelectedId(null)}
           onAction={handleAction}
         />

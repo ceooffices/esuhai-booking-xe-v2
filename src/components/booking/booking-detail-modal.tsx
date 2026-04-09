@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Check, XCircle, UserPlus, Ban, CheckCircle } from 'lucide-react';
+import { X, Check, XCircle, UserPlus, Ban, CheckCircle, ClipboardEdit, Plus, Trash2 } from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import { ModalOverlay } from '@/components/ui/animations';
+import { COST_CATEGORIES } from '@/config/constants';
 import type { BookingStatus } from '@/types/database';
 
 interface Driver { id: string; full_name: string; phone: string; is_available: boolean; }
@@ -39,17 +40,22 @@ interface Props {
   booking: BookingDetail;
   drivers: Driver[];
   vehicles: Vehicle[];
-  userEmail: string;
+
   onClose: () => void;
   onAction: (action: string, data?: Record<string, string>) => Promise<void>;
 }
 
-export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onClose, onAction }: Props) {
-  const [mode, setMode] = useState<'view' | 'assign' | 'reject' | 'cancel'>('view');
+export function BookingDetailModal({ booking, drivers, vehicles, onClose, onAction }: Props) {
+  const [mode, setMode] = useState<'view' | 'assign' | 'reject' | 'cancel' | 'posttrip'>('view');
   const [selectedDriver, setSelectedDriver] = useState('');
   const [selectedVehicle, setSelectedVehicle] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [cancelReason, setCancelReason] = useState('');
+  const [postTrip, setPostTrip] = useState({
+    actual_departure: '', actual_return: '',
+    total_km: '', overnight_hours: '',
+    costs: [{ category: 'xang_dau', description: '', amount: '' }] as { category: string; description: string; amount: string }[],
+  });
   const [loading, setLoading] = useState(false);
   const b = booking;
 
@@ -57,6 +63,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
   const canAssign = b.status === 'da_duyet';
   const canCancel = ['da_duyet', 'cho_tx_xac_nhan', 'tx_da_nhan', 'san_sang'].includes(b.status);
   const canComplete = ['tx_da_nhan', 'san_sang'].includes(b.status);
+  const canPostTrip = b.status === 'da_hoan_thanh';
 
   async function handleAction(action: string, data?: Record<string, string>) {
     setLoading(true);
@@ -241,6 +248,13 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   Hoàn thành chuyến
                 </button>
               )}
+              {canPostTrip && (
+                <button onClick={() => setMode('posttrip')}
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-indigo-600 text-white rounded-xl text-base font-semibold hover:bg-indigo-700 transition">
+                  <ClipboardEdit size={20} />
+                  Cập nhật sau chuyến đi
+                </button>
+              )}
               {canCancel && (
                 <button onClick={() => { setCancelReason(''); setMode('cancel'); }}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-slate-100 text-slate-500 rounded-xl text-sm font-medium hover:bg-slate-200 transition">
@@ -248,6 +262,115 @@ export function BookingDetailModal({ booking, drivers, vehicles, userEmail, onCl
                   Huỷ chuyến
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Cập nhật sau chuyến đi */}
+          {mode === 'posttrip' && (
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <h3 className="text-lg font-bold text-indigo-800">Cập nhật sau chuyến đi</h3>
+              <p className="text-sm text-slate-500">
+                Nhập giờ đi/về thực tế và chi phí phát sinh. Hệ thống tự tính chênh lệch.
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1.5">Giờ đi thực tế</label>
+                  <input type="datetime-local" value={postTrip.actual_departure}
+                    onChange={e => setPostTrip(p => ({ ...p, actual_departure: e.target.value }))}
+                    className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1.5">Giờ về thực tế</label>
+                  <input type="datetime-local" value={postTrip.actual_return}
+                    onChange={e => setPostTrip(p => ({ ...p, actual_return: e.target.value }))}
+                    className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1.5">Tổng KM</label>
+                  <input type="number" step="0.1" value={postTrip.total_km}
+                    onChange={e => setPostTrip(p => ({ ...p, total_km: e.target.value }))}
+                    placeholder="0"
+                    className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-600 mb-1.5">Giờ lưu đêm</label>
+                  <input type="number" step="0.5" value={postTrip.overnight_hours}
+                    onChange={e => setPostTrip(p => ({ ...p, overnight_hours: e.target.value }))}
+                    placeholder="22:00-06:00"
+                    className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+              </div>
+
+              {/* Chi phí phát sinh */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-semibold text-slate-600">Chi phí phát sinh</label>
+                  <button type="button" onClick={() => setPostTrip(p => ({
+                    ...p, costs: [...p.costs, { category: 'khac', description: '', amount: '' }]
+                  }))} className="flex items-center gap-1 text-sm text-indigo-600 font-medium min-h-0 px-0">
+                    <Plus size={14} /> Thêm
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {postTrip.costs.map((cost, idx) => (
+                    <div key={idx} className="flex gap-2 items-start">
+                      <select value={cost.category}
+                        onChange={e => {
+                          const next = [...postTrip.costs];
+                          next[idx] = { ...next[idx], category: e.target.value };
+                          setPostTrip(p => ({ ...p, costs: next }));
+                        }}
+                        className="w-32 shrink-0 px-2 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none">
+                        {COST_CATEGORIES.map(c => (
+                          <option key={c.value} value={c.value}>{c.label}</option>
+                        ))}
+                      </select>
+                      <input placeholder="Mô tả" value={cost.description}
+                        onChange={e => {
+                          const next = [...postTrip.costs];
+                          next[idx] = { ...next[idx], description: e.target.value };
+                          setPostTrip(p => ({ ...p, costs: next }));
+                        }}
+                        className="flex-1 px-2 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      <input type="number" placeholder="Số tiền" value={cost.amount}
+                        onChange={e => {
+                          const next = [...postTrip.costs];
+                          next[idx] = { ...next[idx], amount: e.target.value };
+                          setPostTrip(p => ({ ...p, costs: next }));
+                        }}
+                        className="w-28 shrink-0 px-2 py-2.5 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      {postTrip.costs.length > 1 && (
+                        <button type="button" onClick={() => setPostTrip(p => ({
+                          ...p, costs: p.costs.filter((_, i) => i !== idx)
+                        }))} className="p-2 text-slate-400 hover:text-red-500 min-h-0">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => handleAction('posttrip', {
+                  actual_departure: postTrip.actual_departure,
+                  actual_return: postTrip.actual_return,
+                  total_km: postTrip.total_km,
+                  overnight_hours: postTrip.overnight_hours,
+                  costs: JSON.stringify(postTrip.costs.filter(c => c.amount)),
+                })} disabled={loading}
+                  className="flex-1 py-4 bg-indigo-600 text-white rounded-xl text-base font-semibold hover:bg-indigo-700 disabled:opacity-50 transition">
+                  {loading ? 'Đang lưu...' : 'Lưu cập nhật'}
+                </button>
+                <button onClick={() => setMode('view')}
+                  className="px-6 py-4 bg-slate-100 text-slate-600 rounded-xl text-base font-semibold hover:bg-slate-200 transition">
+                  Quay lại
+                </button>
+              </div>
             </div>
           )}
         </div>
