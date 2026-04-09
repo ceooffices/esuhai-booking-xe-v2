@@ -1,35 +1,32 @@
 import { createClient } from '@/lib/supabase/server';
+import { DriversClient } from '@/components/drivers/drivers-client';
 
 export default async function DriversPage() {
   const supabase = await createClient();
+
   const { data: drivers } = await supabase
     .from('drivers')
     .select('*')
     .order('full_name');
 
+  // Đếm số chuyến đã phục vụ cho mỗi tài xế
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('driver_id, status')
+    .not('driver_id', 'is', null);
+
+  const tripCounts: Record<string, { total: number; completed: number }> = {};
+  bookings?.forEach(b => {
+    if (!b.driver_id) return;
+    if (!tripCounts[b.driver_id]) tripCounts[b.driver_id] = { total: 0, completed: 0 };
+    tripCounts[b.driver_id].total++;
+    if (b.status === 'da_hoan_thanh') tripCounts[b.driver_id].completed++;
+  });
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900">Tài xế</h2>
-      <div className="grid gap-3">
-        {drivers?.map((d) => (
-          <div key={d.id} className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-slate-900">{d.full_name}</div>
-                <div className="text-sm text-slate-500">{d.phone} — Bằng {d.license_type}</div>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                d.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {d.is_available ? 'Sẵn sàng' : 'Không khả dụng'}
-              </span>
-            </div>
-          </div>
-        ))}
-        {(!drivers || drivers.length === 0) && (
-          <div className="text-center py-12 text-slate-400">Chưa có tài xế nào</div>
-        )}
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-slate-900">Quản lý Tài xế</h2>
+      <DriversClient drivers={drivers || []} tripCounts={tripCounts} />
     </div>
   );
 }

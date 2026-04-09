@@ -1,35 +1,46 @@
 import { createClient } from '@/lib/supabase/server';
+import { VehiclesClient } from '@/components/vehicles/vehicles-client';
 
 export default async function VehiclesPage() {
   const supabase = await createClient();
+
   const { data: vehicles } = await supabase
     .from('vehicles')
     .select('*')
     .order('vehicle_type');
 
+  const { data: inspections } = await supabase
+    .from('vehicle_inspections')
+    .select('*')
+    .order('inspection_date', { ascending: false });
+
+  const { data: maintenance } = await supabase
+    .from('vehicle_maintenance')
+    .select('*')
+    .order('maintenance_date', { ascending: false });
+
+  // Group inspections & maintenance by vehicle
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const inspectionMap: Record<string, any[]> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const maintenanceMap: Record<string, any[]> = {};
+  inspections?.forEach(i => {
+    if (!inspectionMap[i.vehicle_id]) inspectionMap[i.vehicle_id] = [];
+    inspectionMap[i.vehicle_id]!.push(i);
+  });
+  maintenance?.forEach(m => {
+    if (!maintenanceMap[m.vehicle_id]) maintenanceMap[m.vehicle_id] = [];
+    maintenanceMap[m.vehicle_id]!.push(m);
+  });
+
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-bold text-slate-900">Phương tiện</h2>
-      <div className="grid gap-3">
-        {vehicles?.map((v) => (
-          <div key={v.id} className="bg-white rounded-xl border border-slate-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-medium text-slate-900">{v.vehicle_type}</div>
-                <div className="text-sm text-slate-500">{v.plate_number} — {v.brand} — {v.seat_count} chỗ</div>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                v.is_available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {v.is_available ? 'Khả dụng' : 'Không khả dụng'}
-              </span>
-            </div>
-          </div>
-        ))}
-        {(!vehicles || vehicles.length === 0) && (
-          <div className="text-center py-12 text-slate-400">Chưa có phương tiện nào</div>
-        )}
-      </div>
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold text-slate-900">Quản lý Phương tiện</h2>
+      <VehiclesClient
+        vehicles={vehicles || []}
+        inspectionMap={inspectionMap}
+        maintenanceMap={maintenanceMap}
+      />
     </div>
   );
 }
