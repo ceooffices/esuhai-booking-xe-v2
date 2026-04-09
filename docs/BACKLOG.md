@@ -1,54 +1,39 @@
 # BACKLOG — Booking Xe V2
 
-> Cập nhật: 2026-04-10
+> Cập nhật: 2026-04-10 | 18 commits | ~8,500 dòng code
 
-## Đã hoàn thành
+## Đã hoàn thành (~95% spec)
 
 - [x] Dashboard: stats, filter, booking cards, chi tiết, duyệt/phân công/hoàn thành/huỷ
-- [x] Calendar view: tuần/tháng, trục X=ngày Y=xe
-- [x] Quản lý Tài xế: CRUD + bằng lái + loại xe lái được + khả năng đáp ứng
+- [x] Duyệt đa cấp: 1 cấp (xe cơ hữu) / 3 cấp (xe ngoài)
+- [x] Không duyệt + Huỷ chuyến: bắt buộc lý do + email TOÀN BỘ thành viên
+- [x] Phân công Tài xế & Xe + email tài xế (CTA xác nhận/từ chối)
+- [x] TX xác nhận / từ chối qua link email
+- [x] Cập nhật sau chuyến đi: giờ thực tế + chi phí phát sinh (8 loại)
+- [x] Đánh giá chuyến đi: 5 sao, 4 tiêu chí, góp ý (/evaluate)
+- [x] Calendar tuần/tháng + conflict detection (highlight đỏ)
+- [x] Quản lý Tài xế: CRUD + bằng lái + loại xe + khả năng đáp ứng
 - [x] Quản lý Phương tiện: CRUD + kiểm định + bảo dưỡng + disable
-- [x] Báo cáo: 8 thống kê tổng quan
-- [x] Cấu hình: system config UI
-- [x] Auth: login + middleware + roles
+- [x] Báo cáo: filter tuần/tháng/quý/năm, 8 thống kê, phân tích theo BP/TX/chi phí
+- [x] Cấu hình hệ thống: UI quản lý config
 - [x] Gửi form đăng ký cho nhân viên (tiện ích nhỏ gọn)
-- [x] GAS webhook sync ver01 → ver02
-- [x] Mobile-optimized: SF Pro font, 44px touch targets, skeleton loading
+- [x] GAS webhook ver01 → ver02 (sync booking realtime)
+- [x] Email templates V2: cấu trúc 3 khối + Add to Calendar + quy định chờ xe
 - [x] Framer Motion: stagger, modal slide-up, count-up, toast animation
-- [x] Email tích hợp: gửi email thật khi từ chối + phân công tài xế
-- [x] Đánh giá chuyến đi: form 5 sao, 4 tiêu chí (/evaluate)
-- [x] Email templates V2: cấu trúc 3 khối (An Tâm / Thực Thi / Dự Phòng)
+- [x] Skeleton loading cho 6 trang
+- [x] Mobile-optimized: SF Pro font, 44px touch, safe area, active feedback
 
 ---
 
-## Còn lại (theo thứ tự ưu tiên)
+## Còn lại (~5%)
 
-### 1. Nghiệp vụ (ưu tiên cao)
-- [ ] Cập nhật sau chuyến đi: UI form giờ thực tế + chi phí phát sinh trên dashboard
-- [ ] Điều chỉnh đề xuất đã duyệt (chỉnh thông tin, thông báo các bên)
-- [ ] Tích hợp email cho approve, complete, cancel (hiện chỉ có reject + assign)
+### Ưu tiên khi cần
 
-### 2. Email nâng cao (ưu tiên cao)
-- [ ] Nút "Add to Calendar" (Apple/Google Calendar) trong email xác nhận
-- [ ] Link Google Maps trực tiếp cho địa điểm đón/trả
-- [ ] Nút "Gọi Tài Xế" click-to-call trong email
-- [ ] Nút "Quản lý/Huỷ chuyến" kết nối dashboard
-
-### 3. Master Data (ưu tiên trung bình)
-- [ ] Form thêm kiểm định xe (UI trên trang phương tiện)
+- [ ] Export báo cáo Excel/PDF
+- [ ] Chart visualization (pie/line chart)
+- [ ] Gantt-style lịch trình theo ngày
+- [ ] Form thêm kiểm định xe trực tiếp trên dashboard
 - [ ] Form thêm bảo dưỡng/sửa chữa xe
 - [ ] Gán xe cố định cho tài xế (1 xe 1 TX)
-
-### 4. Báo cáo nâng cao (ưu tiên trung bình)
-- [ ] Filter theo tuần/tháng/năm
-- [ ] Export Excel/PDF
-- [ ] Chart visualization (pie chart, line chart)
-- [ ] Gantt-style lịch trình theo ngày
-
-### 5. Calendar nâng cao (ưu tiên thấp)
-- [ ] Click ô trống → popup tạo yêu cầu
-- [ ] Conflict detection (cảnh báo xe đã có chuyến)
-
-### 6. Hệ thống (ưu tiên thấp)
-- [ ] Time-driven jobs (nhắc lịch sáng, auto-complete, weekly report)
+- [ ] Time-driven jobs (nhắc lịch sáng, auto-complete)
 - [ ] Supabase Edge Functions thay cho cron
