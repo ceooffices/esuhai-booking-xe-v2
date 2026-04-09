@@ -33,20 +33,8 @@ interface Booking {
   vehicle?: { plate_number: string; vehicle_type: string } | null;
 }
 
-interface Driver {
-  id: string;
-  full_name: string;
-  phone: string;
-  is_available: boolean;
-}
-
-interface Vehicle {
-  id: string;
-  plate_number: string;
-  vehicle_type: string;
-  seat_count: number;
-  is_available: boolean;
-}
+interface Driver { id: string; full_name: string; phone: string; is_available: boolean; }
+interface Vehicle { id: string; plate_number: string; vehicle_type: string; seat_count: number; is_available: boolean; }
 
 type FilterTab = 'pending' | 'approved' | 'waiting' | 'done' | 'all';
 
@@ -123,25 +111,25 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Thống kê */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {[
           { label: 'Chờ duyệt', value: stats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
           { label: 'Đã duyệt', value: stats.approved, color: 'bg-green-50 text-green-700 border-green-200' },
-          { label: 'Chờ TX xác nhận', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+          { label: 'Chờ TX', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
           { label: 'TX từ chối', value: stats.rejected, color: 'bg-rose-50 text-rose-700 border-rose-200' },
           { label: 'Hôm nay', value: stats.today, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
         ].map((s) => (
-          <div key={s.label} className={`rounded-xl p-3 border ${s.color}`}>
-            <div className="text-xl font-bold">{s.value}</div>
-            <div className="text-xs mt-0.5">{s.label}</div>
+          <div key={s.label} className={`rounded-2xl p-4 border ${s.color}`}>
+            <div className="text-2xl font-bold">{s.value}</div>
+            <div className="text-xs mt-1 font-medium">{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Thanh lọc */}
-      <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         {FILTER_TABS.map((tab) => {
           const count = tab.key === 'all'
             ? bookings.length
@@ -150,9 +138,9 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition ${
+              className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold transition min-h-0 ${
                 activeTab === tab.key
-                  ? 'bg-blue-600 text-white'
+                  ? 'bg-blue-600 text-white shadow-sm'
                   : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
               }`}
             >
@@ -163,12 +151,12 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
       </div>
 
       {/* Danh sách yêu cầu */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {filtered.map((b) => (
           <BookingCard key={b.id} booking={b} onSelect={setSelectedId} />
         ))}
         {filtered.length === 0 && (
-          <div className="text-center py-16 text-slate-400">
+          <div className="text-center py-20 text-slate-400 text-base">
             Không có yêu cầu ở bước này
           </div>
         )}
@@ -188,7 +176,7 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
 
       {/* Thông báo */}
       {toast && (
-        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium">
+        <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-xl text-base font-medium max-w-sm text-center">
           {toast}
         </div>
       )}
