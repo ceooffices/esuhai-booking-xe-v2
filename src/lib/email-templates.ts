@@ -114,11 +114,7 @@ function addToCalendarButton(title: string, date: string, startTime: string, end
     </div>`;
 }
 
-// --- Google Maps link ---
-function mapsLink(address: string): string {
-  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-  return `<a href="${url}" style="color:#2563eb;text-decoration:underline;">${address}</a>`;
-}
+
 
 // --- Quy định chờ xe ---
 function waitingPolicy(): string {

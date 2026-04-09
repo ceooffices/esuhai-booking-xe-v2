@@ -1,10 +1,26 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+// Verify webhook secret before processing
+function verifyWebhookAuth(request: Request): boolean {
+  const secret = request.headers.get('x-webhook-secret') || request.headers.get('authorization')?.replace('Bearer ', '');
+  const expectedSecret = process.env.WEBHOOK_SECRET;
+
+  // If no WEBHOOK_SECRET configured, allow (backward compatible, but log warning)
+  if (!expectedSecret) return true;
+
+  return secret === expectedSecret;
+}
+
 // Google Form submit → GAS onFormSubmit → POST webhook → Supabase
 // Cũng dùng cho form tạo yêu cầu trên dashboard ver02
 export async function POST(request: Request) {
   try {
+    // --- Security: Verify webhook secret ---
+    if (!verifyWebhookAuth(request)) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await request.json();
     const supabase = createAdminClient();
 

@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email';
-import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail } from '@/lib/email-templates';
+import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail, buildNewBookingEmail } from '@/lib/email-templates';
 import type { BookingStatus } from '@/types/database';
 
 async function requireAuthUserEmail() {
@@ -47,8 +47,8 @@ async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient
     rejectionReason: b.rejection_reason,
     driverRejectionReason: b.driver_rejection_reason,
     dashboardUrl: `${appUrl}/dashboard`,
-    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}`,
-    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}`,
+    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}&token=${b.driver_id}`,
+    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}&token=${b.driver_id}`,
   };
 }
 
@@ -101,7 +101,7 @@ export async function approveBooking(bookingId: string, clientApproverEmail?: st
   let approverEmail = clientApproverEmail || '';
   try {
     approverEmail = await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   
@@ -145,6 +145,19 @@ export async function approveBooking(bookingId: string, clientApproverEmail?: st
 
   if (updateErr) return { error: updateErr.message };
 
+  // Khi booking đạt trạng thái "đã duyệt" cuối cùng → gửi email cho quản lý để phân bổ tài xế
+  if (updateData.status === 'da_duyet') {
+    const emailData = await getBookingEmailData(supabase, bookingId);
+    if (emailData) {
+      const config = await getEmailConfig(supabase);
+      if (config.manager_email) {
+        const tpl = buildNewBookingEmail(emailData);
+        const result = await sendEmail({ to: config.manager_email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
+        await logEmail(supabase, bookingId, 'approved_notify_manager', config.manager_email, tpl.subject, result.success, result.error);
+      }
+    }
+  }
+
   return { success: true, newStatus: updateData.status };
 }
 
@@ -153,7 +166,7 @@ export async function rejectBooking(bookingId: string, clientRejectedBy: string,
   let rejectedBy = clientRejectedBy;
   try {
     rejectedBy = await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
 
@@ -188,7 +201,7 @@ export async function rejectBooking(bookingId: string, clientRejectedBy: string,
 export async function assignDriverVehicle(bookingId: string, driverId: string, vehicleId: string) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -229,7 +242,7 @@ export async function cancelBooking(bookingId: string, clientCancelledBy: string
   let cancelledBy = clientCancelledBy;
   try {
     cancelledBy = await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
 
@@ -272,7 +285,7 @@ export async function cancelBooking(bookingId: string, clientCancelledBy: string
 export async function completeTrip(bookingId: string) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -293,7 +306,7 @@ export async function saveDriver(id: string | null, data: {
 }) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -322,7 +335,7 @@ export async function saveVehicle(id: string | null, data: {
 }) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -349,7 +362,7 @@ export async function savePostTrip(bookingId: string, data: {
 }, userId: string) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -371,7 +384,7 @@ export async function savePostTripCost(postTripId: string, bookingId: string, da
 }) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();
@@ -416,7 +429,7 @@ export async function submitEvaluation(bookingId: string, data: {
 export async function updateConfig(key: string, value: string) {
   try {
     await requireAuthUserEmail();
-  } catch (e) {
+  } catch {
     return { error: 'Unauthorized' };
   }
   const supabase = createAdminClient();

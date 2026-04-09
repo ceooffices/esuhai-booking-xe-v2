@@ -7,6 +7,7 @@ function DriverResponseContent() {
   const searchParams = useSearchParams();
   const action = searchParams.get('action');
   const bookingId = searchParams.get('id');
+  const token = searchParams.get('token');
   const [reason, setReason] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState('');
@@ -20,6 +21,7 @@ function DriverResponseContent() {
         body: JSON.stringify({
           action: finalAction,
           booking_id: bookingId,
+          token: token || undefined,
           reason: reason || undefined,
         }),
       });
@@ -41,7 +43,7 @@ function DriverResponseContent() {
     }
   }
 
-  if (!action || !bookingId) {
+  if (!action || !bookingId || !token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm text-center">

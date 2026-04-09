@@ -181,7 +181,10 @@ export function CalendarClient({ vehicles, bookings }: Props) {
             {vehicles.map(v => (
               <tr key={v.id} className="hover:bg-slate-50/50">
                 <td className="sticky left-0 bg-white border-b border-r border-slate-200 px-3 py-2 z-10">
-                  <div className="text-sm font-medium text-slate-800">{v.vehicle_type}</div>
+                  <div className="text-sm font-medium text-slate-800 flex items-center gap-2">
+                    {v.vehicle_type}
+                    {!v.is_available && <span className="text-[10px] px-1.5 py-0.5 bg-red-100 text-red-600 rounded whitespace-nowrap">Bảo trì</span>}
+                  </div>
                   <div className="text-xs text-slate-400">{v.plate_number} — {v.seat_count} chỗ</div>
                 </td>
                 {dates.map(d => {

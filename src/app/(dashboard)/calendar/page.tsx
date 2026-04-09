@@ -7,7 +7,6 @@ export default async function CalendarPage() {
   const { data: vehicles } = await supabase
     .from('vehicles')
     .select('id, plate_number, vehicle_type, seat_count, is_available')
-    .eq('is_available', true)
     .order('vehicle_type');
 
   const today = new Date();
@@ -23,7 +22,7 @@ export default async function CalendarPage() {
       driver:drivers(full_name, phone),
       vehicle:vehicles(plate_number, vehicle_type)
     `)
-    .in('status', ['da_duyet', 'cho_tx_xac_nhan', 'tx_da_nhan', 'san_sang'])
+    .in('status', ['da_duyet', 'cho_tx_xac_nhan', 'tx_da_nhan', 'san_sang', 'da_hoan_thanh'])
     .gte('trip_date', today.toISOString().split('T')[0])
     .lte('trip_date', fourWeeksLater.toISOString().split('T')[0])
     .order('trip_date');
