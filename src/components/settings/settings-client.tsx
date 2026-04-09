@@ -26,9 +26,11 @@ const CONFIG_LABELS: Record<string, string> = {
   email_method: 'Phương thức gửi email',
   sender_name: 'Tên người gửi email',
   sender_email: 'Email người gửi',
+  google_form_url: 'URL Google Form đăng ký xe',
 };
 
 const CONFIG_GROUPS = [
+  { title: 'Google Form', keys: ['google_form_url'] },
   { title: 'Cấp duyệt', keys: ['approval_levels_internal', 'approval_levels_external', 'approver_l1_email', 'approver_l2_email', 'approver_l3_email'] },
   { title: 'Quản lý', keys: ['manager_email', 'manager_name', 'always_cc'] },
   { title: 'Email', keys: ['email_method', 'sender_name', 'sender_email', 'n8n_webhook_notify', 'n8n_webhook_driver'] },

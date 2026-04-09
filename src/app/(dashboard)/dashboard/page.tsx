@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { DashboardClient } from '@/components/booking/dashboard-client';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
+  const admin = createAdminClient();
 
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -16,10 +18,19 @@ export default async function DashboardPage() {
     .order('created_at', { ascending: false })
     .limit(200);
 
-  const [{ data: drivers }, { data: vehicles }] = await Promise.all([
+  const [{ data: drivers }, { data: vehicles }, { data: staffRows }, { data: formConfig }] = await Promise.all([
     supabase.from('drivers').select('id, full_name, phone, is_available').order('full_name'),
     supabase.from('vehicles').select('id, plate_number, vehicle_type, seat_count, is_available').order('vehicle_type'),
+    admin.from('staff').select('name, department, email').not('email', 'is', null).order('department, name'),
+    supabase.from('system_config').select('value').eq('key', 'google_form_url').single(),
   ]);
+
+  // Staff list cho send form modal
+  const staffList = (staffRows || []).map((s: { name: string; department: string; email: string }) => ({
+    name: s.name,
+    department: s.department || '',
+    email: s.email,
+  }));
 
   const today = new Date().toISOString().split('T')[0];
   const list = bookings || [];
@@ -41,6 +52,8 @@ export default async function DashboardPage() {
         vehicles={vehicles || []}
         userEmail={user?.email || ''}
         stats={stats}
+        staffList={staffList}
+        formUrl={formConfig?.value || ''}
       />
     </div>
   );

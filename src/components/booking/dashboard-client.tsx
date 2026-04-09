@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { Send } from 'lucide-react';
 import { BookingCard } from './booking-card';
 import { BookingDetailModal } from './booking-detail-modal';
+import { SendFormModal } from './send-form-modal';
 import { approveBooking, rejectBooking, assignDriverVehicle, cancelBooking, completeTrip } from '@/lib/actions';
 import { useRouter } from 'next/navigation';
 import type { BookingStatus } from '@/types/database';
@@ -52,12 +54,15 @@ interface Props {
   vehicles: Vehicle[];
   userEmail: string;
   stats: { pending: number; approved: number; waiting: number; rejected: number; today: number };
+  staffList: { name: string; department: string; email: string }[];
+  formUrl: string;
 }
 
-export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats }: Props) {
+export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats, staffList, formUrl }: Props) {
   const [activeTab, setActiveTab] = useState<FilterTab>('pending');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
@@ -112,6 +117,13 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
 
   return (
     <div className="space-y-5">
+      {/* Gửi form đăng ký xe */}
+      <button onClick={() => setShowCreate(true)}
+        className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl text-base font-bold hover:bg-blue-700 transition shadow-sm">
+        <Send size={20} />
+        Gửi form đăng ký xe cho nhân viên
+      </button>
+
       {/* Thống kê */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {[
@@ -171,6 +183,15 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats 
           userEmail={userEmail}
           onClose={() => setSelectedId(null)}
           onAction={handleAction}
+        />
+      )}
+
+      {/* Gửi form cho nhân viên */}
+      {showCreate && (
+        <SendFormModal
+          staffList={staffList}
+          formUrl={formUrl}
+          onClose={() => setShowCreate(false)}
         />
       )}
 
