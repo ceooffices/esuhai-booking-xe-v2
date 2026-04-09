@@ -117,12 +117,14 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
 
   return (
     <div className="space-y-5">
-      {/* Gửi form đăng ký xe */}
-      <button onClick={() => setShowCreate(true)}
-        className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-2xl text-base font-bold hover:bg-blue-700 transition shadow-sm">
-        <Send size={20} />
-        Gửi form đăng ký xe cho nhân viên
-      </button>
+      {/* Thanh tiện ích */}
+      <div className="flex items-center gap-2">
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition min-h-0 shrink-0">
+          <Send size={14} />
+          Gửi form đăng ký
+        </button>
+      </div>
 
       {/* Thống kê */}
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
