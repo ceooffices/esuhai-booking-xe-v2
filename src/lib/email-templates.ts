@@ -86,6 +86,48 @@ function driverCard(name: string, phone: string, vehicle?: string, plate?: strin
     </div>`;
 }
 
+// --- Add to Calendar (Google Calendar link) ---
+function addToCalendarButton(title: string, date: string, startTime: string, endTime?: string, location?: string): string {
+  // Format: YYYYMMDDTHHMMSS
+  const dateClean = date.replace(/-/g, '');
+  const start = startTime.replace(':', '') + '00';
+  const end = endTime ? endTime.replace(':', '') + '00' : start;
+  const dtStart = `${dateClean}T${start}`;
+  const dtEnd = `${dateClean}T${end}`;
+
+  const params = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: title,
+    dates: `${dtStart}/${dtEnd}`,
+    details: `Chuyến xe Esuhai — ${title}`,
+    location: location || 'Văn phòng Esuhai',
+    ctz: 'Asia/Ho_Chi_Minh',
+  });
+
+  const googleUrl = `https://calendar.google.com/calendar/render?${params.toString()}`;
+
+  return `
+    <div style="text-align:center;padding:8px 0;">
+      <a href="${googleUrl}" style="display:inline-block;background:#ffffff;color:#2563eb;padding:12px 24px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:600;border:2px solid #2563eb;">
+        Thêm vào Lịch
+      </a>
+    </div>`;
+}
+
+// --- Google Maps link ---
+function mapsLink(address: string): string {
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+  return `<a href="${url}" style="color:#2563eb;text-decoration:underline;">${address}</a>`;
+}
+
+// --- Quy định chờ xe ---
+function waitingPolicy(): string {
+  return `
+    <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;margin:12px 0;font-size:13px;color:#92400e;line-height:1.5;">
+      Tài xế sẽ chờ tối đa 15 phút tại điểm đón. Nếu có thay đổi, vui lòng liên hệ tài xế trực tiếp.
+    </div>`;
+}
+
 function footerNote(text: string): string {
   return `
     <div style="padding:16px 24px;background:#f8fafc;border-top:1px solid #e2e8f0;border-radius:0 0 16px 16px;">
@@ -155,6 +197,8 @@ export function buildDriverAssignEmail(d: BookingEmailData & { confirmUrl: strin
       <div style="text-align:center;">
         <a href="${d.rejectUrl}" style="color:#64748b;font-size:14px;text-decoration:underline;">Từ chối — ghi lý do</a>
       </div>
+
+      ${addToCalendarButton(d.purpose, d.tripDate, d.pickupTime, d.endTime, d.itinerary)}
     </div>
     ${footerNote('Nếu xác nhận, thông tin sẽ được gửi đến người yêu cầu và nhân viên phụ trách. Nếu có trở ngại, vui lòng phản hồi sớm để Ban Điều Phối kịp thời xử lý.')}`;
 
@@ -188,6 +232,10 @@ export function buildConfirmBookerEmail(d: BookingEmailData): { subject: string;
       ${d.driverName && d.driverPhone ? driverCard(d.driverName, d.driverPhone, d.vehicleType, d.plateNumber) : ''}
 
       ${d.driverPhone ? ctaButton(`Gọi Tài Xế: ${d.driverPhone}`, `tel:${d.driverPhone.replace(/\s/g, '')}`, '#16a34a') : ''}
+
+      ${addToCalendarButton(d.purpose, d.tripDate, d.pickupTime, d.endTime, d.itinerary)}
+
+      ${waitingPolicy()}
     </div>
     ${footerNote('Nếu có thay đổi lịch trình, vui lòng liên hệ Phòng Tổng Hợp sớm nhất có thể.')}`;
 

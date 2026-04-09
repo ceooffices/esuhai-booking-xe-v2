@@ -98,6 +98,18 @@ export function CalendarClient({ vehicles, bookings }: Props) {
   // Unassigned bookings (no vehicle)
   const unassigned = bookings.filter(b => !b.vehicle_id);
 
+  // Conflict detection: kiểm tra trùng giờ trên cùng xe
+  const conflicts = useMemo(() => {
+    const set = new Set<string>();
+    Object.entries(bookingMap).forEach(([key, bks]) => {
+      if (bks.length >= 2) {
+        // Cùng xe, cùng ngày, >= 2 chuyến → potential conflict
+        set.add(key);
+      }
+    });
+    return set;
+  }, [bookingMap]);
+
   function navigate(dir: number) {
     const next = new Date(baseDate);
     if (viewMode === 'week') next.setDate(next.getDate() + dir * 7);
@@ -175,11 +187,12 @@ export function CalendarClient({ vehicles, bookings }: Props) {
                 {dates.map(d => {
                   const key = `${v.id}_${fmtDate(d)}`;
                   const cellBookings = bookingMap[key] || [];
+                  const hasConflict = conflicts.has(key);
                   return (
                     <td
                       key={fmtDate(d)}
                       className={`border-b border-r border-slate-200 px-1 py-1 align-top ${
-                        isToday(d) ? 'bg-blue-50/30' : ''
+                        hasConflict ? 'bg-red-50' : isToday(d) ? 'bg-blue-50/30' : ''
                       }`}
                     >
                       {cellBookings.map(b => (
