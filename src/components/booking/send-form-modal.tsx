@@ -1,69 +1,63 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Send, Search, Check } from 'lucide-react';
-
-interface Staff {
-  name: string;
-  department: string;
-  email: string;
-}
+import { X, Send, Check, Mail } from 'lucide-react';
 
 interface Props {
-  staffList: Staff[];
+  staffList: { name: string; department: string; email: string; title?: string; is_manager?: boolean }[];
   formUrl: string;
   onClose: () => void;
 }
 
 export function SendFormModal({ staffList, formUrl, onClose }: Props) {
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [email, setEmail] = useState('');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
 
-  const filtered = search.trim()
-    ? staffList.filter(s =>
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.department.toLowerCase().includes(search.toLowerCase()) ||
-        s.email.toLowerCase().includes(search.toLowerCase())
-      )
-    : staffList;
-
-  function toggle(email: string) {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(email)) next.delete(email);
-      else next.add(email);
-      return next;
-    });
-  }
-
-  function selectAll() {
-    if (selected.size === filtered.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(filtered.map(s => s.email)));
-    }
-  }
+  // Auto-detect staff name from email
+  const matchedStaff = staffList.find(s => s.email?.toLowerCase() === email.trim().toLowerCase());
 
   async function handleSend() {
-    if (selected.size === 0 || !formUrl) return;
+    const trimmed = email.trim();
+    if (!trimmed) return;
+
+    // Basic email validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setError('Email không hợp lệ');
+      return;
+    }
+
     setSending(true);
+    setError('');
 
     try {
-      await fetch('/api/send-form-link', {
+      const res = await fetch('/api/send-form-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          emails: Array.from(selected),
+          emails: [trimmed],
           form_url: formUrl,
+          recipient_name: matchedStaff?.name || '',
         }),
       });
-      setDone(true);
+      const data = await res.json();
+      if (data.success) {
+        setDone(true);
+      } else {
+        setError(data.error || 'Có lỗi xảy ra');
+      }
     } catch {
-      // silent fail
+      setError('Không kết nối được server');
     }
     setSending(false);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSend();
+    }
   }
 
   if (done) {
@@ -73,10 +67,14 @@ export function SendFormModal({ staffList, formUrl, onClose }: Props) {
           <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Check size={32} className="text-emerald-600" />
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">Đã gửi thành công</h3>
+          <h3 className="text-xl font-bold text-slate-900 mb-2">Đã gửi thành công!</h3>
           <p className="text-base text-slate-500">
-            Đã gửi link đăng ký xe đến {selected.size} nhân viên
+            Email hướng dẫn đăng ký xe đã được gửi đến
           </p>
+          <p className="text-base font-semibold text-blue-600 mt-1">{email}</p>
+          {matchedStaff && (
+            <p className="text-sm text-slate-400 mt-1">{matchedStaff.name} — {matchedStaff.department}</p>
+          )}
           <button onClick={onClose}
             className="mt-6 w-full py-3.5 bg-slate-100 text-slate-700 rounded-xl text-base font-semibold hover:bg-slate-200 transition">
             Đóng
@@ -87,75 +85,76 @@ export function SendFormModal({ staffList, formUrl, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-3xl max-h-[92vh] flex flex-col">
+        className="bg-white w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl">
 
-        <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-5 flex items-center justify-between rounded-t-3xl sm:rounded-t-2xl">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900">Gửi form đăng ký xe</h2>
-            <p className="text-sm text-slate-500 mt-0.5">Chọn nhân viên để gửi link Google Form</p>
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <Mail size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">Gửi hướng dẫn đăng ký xe</h2>
+              <p className="text-blue-200 text-sm">Nhập email người nhận</p>
+            </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 min-h-0">
-            <X size={24} />
+          <button onClick={onClose} className="p-2 text-white/70 hover:text-white rounded-lg hover:bg-white/10 min-h-0">
+            <X size={20} />
           </button>
         </div>
 
-        {/* Tìm kiếm */}
-        <div className="px-6 py-3 border-b border-slate-100">
-          <div className="relative">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder="Tìm theo tên, phòng ban, email..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none" />
+        {/* Body */}
+        <div className="px-6 py-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-600 mb-2">Email người nhận</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(''); }}
+              onKeyDown={handleKeyDown}
+              placeholder="abc@esuhai.com"
+              autoFocus
+              className="w-full px-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none"
+            />
           </div>
-          <div className="flex items-center justify-between mt-3">
-            <button onClick={selectAll} className="text-sm font-semibold text-blue-600 min-h-0 px-0">
-              {selected.size === filtered.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả'}
-            </button>
-            <span className="text-sm text-slate-400">
-              Đã chọn {selected.size} / {staffList.length}
-            </span>
-          </div>
-        </div>
 
-        {/* Danh sách nhân viên */}
-        <div className="flex-1 overflow-y-auto px-4 py-2" style={{ maxHeight: '50vh' }}>
-          {filtered.map(s => (
-            <button key={s.email} onClick={() => toggle(s.email)}
-              className={`w-full flex items-center gap-3 px-3 py-3.5 rounded-xl text-left transition min-h-0 ${
-                selected.has(s.email) ? 'bg-blue-50' : 'hover:bg-slate-50'
-              }`}>
-              <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center shrink-0 transition ${
-                selected.has(s.email) ? 'bg-blue-600 border-blue-600' : 'border-slate-300'
-              }`}>
-                {selected.has(s.email) && <Check size={14} className="text-white" />}
+          {/* Auto-detect staff info */}
+          {matchedStaff && (
+            <div className="flex items-center gap-3 bg-blue-50 rounded-xl px-4 py-3 border border-blue-100">
+              <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm shrink-0">
+                {matchedStaff.name.charAt(0)}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-base font-semibold text-slate-800 truncate">{s.name}</div>
-                <div className="text-sm text-slate-500 truncate">{s.department} — {s.email}</div>
+              <div className="min-w-0">
+                <div className="text-sm font-semibold text-slate-800 truncate">
+                  {matchedStaff.name}
+                  {matchedStaff.is_manager && (
+                    <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">QL</span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500 truncate">{matchedStaff.department}{matchedStaff.title ? ` · ${matchedStaff.title}` : ''}</div>
               </div>
-            </button>
-          ))}
-          {filtered.length === 0 && (
-            <div className="text-center py-12 text-slate-400 text-base">
-              Không tìm thấy nhân viên
             </div>
           )}
-        </div>
 
-        {/* Nút gửi */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-white">
-          {!formUrl && (
-            <p className="text-sm text-amber-600 mb-3">
-              Vui lòng cấu hình URL Google Form tại trang Cấu hình trước khi gửi.
-            </p>
+          {error && (
+            <div className="bg-red-50 text-red-700 px-4 py-3 rounded-xl text-sm">{error}</div>
           )}
-          <button onClick={handleSend}
-            disabled={selected.size === 0 || !formUrl || sending}
-            className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl text-lg font-bold hover:bg-blue-700 disabled:opacity-50 transition">
-            <Send size={20} />
-            {sending ? 'Đang gửi...' : `Gửi link cho ${selected.size} nhân viên`}
+
+          {!formUrl && (
+            <div className="bg-amber-50 text-amber-700 px-4 py-3 rounded-xl text-sm">
+              Vui lòng cấu hình URL Google Form tại trang Cấu hình trước khi gửi.
+            </div>
+          )}
+
+          <button
+            onClick={handleSend}
+            disabled={!email.trim() || !formUrl || sending}
+            className="w-full flex items-center justify-center gap-2 py-4 bg-blue-600 text-white rounded-xl text-base font-bold hover:bg-blue-700 disabled:opacity-50 transition"
+          >
+            <Send size={18} />
+            {sending ? 'Đang gửi...' : 'Gửi email hướng dẫn'}
           </button>
         </div>
       </div>
