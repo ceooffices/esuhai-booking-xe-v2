@@ -1,7 +1,9 @@
 // ============================================================
-// Email Service — Send via n8n webhook
-// n8n relay htmlBody trực tiếp qua SMTP (Office365)
+// Email Service V2 — Gửi trực tiếp qua SMTP (Office365)
+// Độc lập hoàn toàn — không dùng n8n
 // ============================================================
+
+import nodemailer from 'nodemailer';
 
 interface EmailPayload {
   to: string;
@@ -13,39 +15,43 @@ interface EmailPayload {
   senderEmail?: string;
 }
 
-export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
-  const webhookUrl = process.env.N8N_WEBHOOK_NOTIFY;
+function createTransport() {
+  const host = process.env.SMTP_HOST;
+  const port = parseInt(process.env.SMTP_PORT || '587', 10);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
 
-  if (!webhookUrl) {
-    console.error('N8N_WEBHOOK_NOTIFY not configured');
-    return { success: false, error: 'Webhook not configured' };
+  if (!host || !user || !pass) {
+    throw new Error('SMTP chưa cấu hình. Cần: SMTP_HOST, SMTP_USER, SMTP_PASS');
   }
 
+  return nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+}
+
+export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        to: payload.to,
-        cc: payload.cc || '',
-        bcc: payload.bcc || '',
-        subject: payload.subject,
-        body: payload.subject,
-        htmlBody: payload.html,   // n8n đọc field này: $json.body.htmlBody
-        senderName: payload.senderName || 'Phòng Tổng hợp - Esuhai',
-        senderEmail: payload.senderEmail || 'booking.xe@esuhai.com',
-        type: 'booking_notification',
-      }),
+    const transport = createTransport();
+    const senderName = payload.senderName || 'Phòng Tổng hợp - Esuhai';
+    const senderEmail = payload.senderEmail || process.env.SMTP_USER || 'booking.xe@esuhai.com';
+
+    await transport.sendMail({
+      from: `"${senderName}" <${senderEmail}>`,
+      to: payload.to,
+      cc: payload.cc || undefined,
+      bcc: payload.bcc || undefined,
+      subject: payload.subject,
+      html: payload.html,
     });
 
-    if (!res.ok) {
-      const text = await res.text();
-      return { success: false, error: `n8n error: ${res.status} ${text}` };
-    }
-
-    console.log(`[email] n8n OK → ${payload.to}`);
+    console.log(`[email] SMTP OK → ${payload.to}`);
     return { success: true };
   } catch (err) {
+    console.error(`[email] SMTP error:`, err);
     return { success: false, error: String(err) };
   }
 }

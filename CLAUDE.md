@@ -4,7 +4,7 @@
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS
 - **Database**: Supabase (PostgreSQL) with Row Level Security
 - **Auth**: Supabase Auth (Magic Link email)
-- **Email**: n8n Cloud webhooks (esuhai.app.n8n.cloud) > Office365 SMTP
+- **Email**: Nodemailer SMTP trực tiếp (Office365) — độc lập, không dùng n8n
 - **Deploy**: Vercel (free tier)
 - **Staff data**: Supabase (same instance, `staff` table from Ver01)
 
