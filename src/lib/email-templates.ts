@@ -16,7 +16,7 @@
 // 3. buildConfirmBookerEmail  — Xác nhận → Người yêu cầu
 // 4. buildConfirmStaffEmail   — Thông tin → NV phụ trách
 // 5. buildConfirmManagerEmail — Hoàn tất → Quản lý
-// 6. buildDriverRejectEmail   — TX từ chối → Quản lý
+// 6. buildDriverRejectEmail   — Tài xế từ chối → Quản lý
 // 7. buildRejectBookerEmail   — Không duyệt → Người yêu cầu
 // 8. buildCancellationEmail   — Huỷ chuyến → Toàn bộ
 // 9. buildRejectAllEmail      — Không duyệt → Toàn bộ
@@ -768,7 +768,7 @@ export function buildConfirmManagerEmail(d: BookingEmailData): { subject: string
 }
 
 // ============================================================
-// TEMPLATE 6: TX TỪ CHỐI → QUẢN LÝ (Step 2 active — quay lại)
+// TEMPLATE 6: TÀI XẾ TỪ CHỐI → QUẢN LÝ (Step 2 active — quay lại)
 // ============================================================
 
 export function buildDriverRejectEmail(d: BookingEmailData): { subject: string; html: string } {

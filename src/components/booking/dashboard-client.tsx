@@ -45,7 +45,7 @@ type FilterTab = 'pending' | 'approved' | 'waiting' | 'done' | 'all';
 const FILTER_TABS: { key: FilterTab; label: string; statuses: BookingStatus[] }[] = [
   { key: 'pending', label: 'Chờ duyệt', statuses: ['cho_duyet', 'cho_duyet_cap2', 'cho_duyet_cap3'] },
   { key: 'approved', label: 'Đã duyệt', statuses: ['da_duyet'] },
-  { key: 'waiting', label: 'Chờ TX', statuses: ['cho_tx_xac_nhan', 'tx_da_nhan', 'tx_tu_choi'] },
+  { key: 'waiting', label: 'Chờ tài xế', statuses: ['cho_tx_xac_nhan', 'tx_da_nhan', 'tx_tu_choi'] },
   { key: 'done', label: 'Hoàn thành', statuses: ['da_hoan_thanh', 'san_sang'] },
   { key: 'all', label: 'Tất cả', statuses: [] },
 ];
@@ -172,8 +172,8 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
           {[
             { label: 'Chờ duyệt', value: stats.pending, color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
             { label: 'Đã duyệt', value: stats.approved, color: 'bg-green-50 text-green-700 border-green-200' },
-            { label: 'Chờ TX', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
-            { label: 'TX từ chối', value: stats.rejected, color: 'bg-rose-50 text-rose-700 border-rose-200' },
+            { label: 'Chờ tài xế', value: stats.waiting, color: 'bg-blue-50 text-blue-700 border-blue-200' },
+            { label: 'Tài xế từ chối', value: stats.rejected, color: 'bg-rose-50 text-rose-700 border-rose-200' },
             { label: 'Hôm nay', value: stats.today, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
           ].map((s) => (
             <div key={s.label} className={`rounded-2xl p-4 border ${s.color}`}>
