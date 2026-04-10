@@ -107,12 +107,12 @@ export async function POST(request: Request) {
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-      // Gửi email xác nhận chuyến xe cho người yêu cầu + CC quản lý
+      // Gửi email xác nhận chuyến xe cho người đăng ký + CC quản lý
       const emailData = await getBookingEmailData(supabase, booking_id);
       if (emailData) {
         const config = await getEmailConfig(supabase);
 
-        // Email cho người yêu cầu (Xe đã sẵn sàng)
+        // Email cho người đăng ký (Xe đã sẵn sàng)
         if (emailData.requesterEmail) {
           const tpl = buildConfirmBookerEmail(emailData);
           const result = await sendEmail({ to: emailData.requesterEmail, cc: config.always_cc, subject: tpl.subject, html: tpl.html });

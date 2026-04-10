@@ -95,7 +95,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, onClose, onActi
           {/* Thông tin chi tiết */}
           <div className="space-y-4">
             <InfoRow label="Mục đích" value={b.purpose} bold />
-            <InfoRow label="Người yêu cầu" value={`${b.requester_name} — ${b.requester_department}`} />
+            <InfoRow label="Người đăng ký" value={`${b.requester_name} — ${b.requester_department}`} />
             <div className="grid grid-cols-2 gap-3">
               <InfoRow label="Ngày đi" value={b.trip_date} />
               <InfoRow label="Giờ đón" value={`${b.pickup_time}${b.end_time ? ' — ' + b.end_time : ''}`} />
@@ -198,7 +198,7 @@ export function BookingDetailModal({ booking, drivers, vehicles, onClose, onActi
             <div className="space-y-4 pt-4 border-t border-slate-200">
               <h3 className="text-lg font-bold text-red-700">Huỷ chuyến xe</h3>
               <p className="text-sm text-slate-500">
-                Thông báo huỷ sẽ được gửi đến toàn bộ thành viên tham gia quy trình: người yêu cầu, NV phụ trách, tài xế và quản lý.
+                Thông báo huỷ sẽ được gửi đến toàn bộ thành viên tham gia quy trình: người đăng ký, NV phụ trách, tài xế và quản lý.
               </p>
               <textarea value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Vui lòng nhập lý do huỷ chuyến (bắt buộc)..."

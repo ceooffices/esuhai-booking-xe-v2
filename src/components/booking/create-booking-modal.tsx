@@ -134,11 +134,11 @@ export function CreateBookingModal({ onClose, onCreated, staffList }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
-          {/* Người yêu cầu — Autocomplete */}
+          {/* Người đăng ký — Autocomplete */}
           <div className="space-y-4">
             <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
               <User size={16} className="text-blue-500" />
-              Người yêu cầu
+              Người đăng ký
             </h3>
 
             {/* Autocomplete input */}

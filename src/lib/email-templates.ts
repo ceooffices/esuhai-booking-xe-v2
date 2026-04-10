@@ -13,11 +13,11 @@
 // 0. buildFormInviteEmail     — Gửi form đăng ký cho nhân viên
 // 1. buildNewBookingEmail     — Yêu cầu mới → Quản lý
 // 2. buildDriverAssignEmail   — Phân công → Tài xế
-// 3. buildConfirmBookerEmail  — Xác nhận → Người yêu cầu
+// 3. buildConfirmBookerEmail  — Xác nhận → Người đăng ký
 // 4. buildConfirmStaffEmail   — Thông tin → NV phụ trách
 // 5. buildConfirmManagerEmail — Hoàn tất → Quản lý
 // 6. buildDriverRejectEmail   — Tài xế từ chối → Quản lý
-// 7. buildRejectBookerEmail   — Không duyệt → Người yêu cầu
+// 7. buildRejectBookerEmail   — Không duyệt → Người đăng ký
 // 8. buildCancellationEmail   — Huỷ chuyến → Toàn bộ
 // 9. buildRejectAllEmail      — Không duyệt → Toàn bộ
 // ============================================================
@@ -496,8 +496,8 @@ function driverCardRow(name: string, phone: string, vehicle?: string, plate?: st
 <tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:0 40px 16px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
 <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="border:1px solid #bbf7d0;border-collapse:separate;">
 <tr><td style="padding:20px;background-color:#f0fdf4;">
-<p style="margin:0 0 8px;color:#15803d;font-size:11px;font-family:${F};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Tài xế phục vụ</p>
-<p style="margin:0;color:#166534;font-size:18px;font-family:${F};font-weight:700;">${esc(name)}</p>
+<p style="margin:0 0 4px;color:#15803d;font-size:11px;font-family:${F};font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">Tài xế phục vụ</p>
+<p style="margin:0;color:#166534;font-size:18px;font-family:${F};font-weight:700;">Tài xế ${esc(name)}</p>
 <p style="margin:6px 0 0;"><a href="tel:${phone.replace(/\s/g, '')}" style="color:${GREEN};font-size:15px;font-family:${F};text-decoration:underline;">${esc(phone)}</a></p>
 ${vehicle ? `<p style="margin:8px 0 0;color:#166534;font-size:14px;font-family:${F};">${esc(vehicle)}${plate ? ' — ' + esc(plate) : ''}</p>` : ''}
 </td></tr>
@@ -620,7 +620,7 @@ export function buildNewBookingEmail(d: BookingEmailData): { subject: string; ht
     ),
     ticketDivider(),
     detailSection([
-      { label: 'Người yêu cầu', value: `${esc(d.requesterName)} <span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:3px 8px;">${esc(d.requesterDepartment)}</span>` },
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} <span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:3px 8px;">${esc(d.requesterDepartment)}</span>` },
       { label: 'Mục đích', value: esc(d.purpose) },
       { label: 'Chuyến bay', value: d.flightNumber ? `<strong>${esc(d.flightNumber)}</strong>` : '' },
       { label: 'Thành viên', value: d.memberNames ? esc(d.memberNames) : '' },
@@ -661,7 +661,7 @@ export function buildDriverAssignEmail(d: BookingEmailData & { confirmUrl: strin
     d.itinerary ? timelineRow(d.itinerary) : '',
     dualActionRow(d.confirmUrl, d.rejectUrl),
     calendarInlineRow(d.purpose, d.tripDate, d.pickupTime, d.endTime, d.itinerary),
-    footerRow('Nếu xác nhận, thông tin sẽ được gửi đến người yêu cầu và nhân viên phụ trách. Nếu từ chối, vui lòng ghi rõ lý do để Ban Điều Phối sắp xếp tài xế khác.', d.bookingId),
+    footerRow('Nếu xác nhận, thông tin sẽ được gửi đến người đăng ký và nhân viên phụ trách. Nếu từ chối, vui lòng ghi rõ lý do để Ban Điều Phối sắp xếp tài xế khác.', d.bookingId),
   ].join('');
 
   return { subject, html: baseWrapper(content) };
@@ -720,7 +720,7 @@ export function buildConfirmStaffEmail(d: BookingEmailData): { subject: string; 
     dateHighlightCard('Lịch đón xác nhận', d.tripDate, timeStr, '#22c55e', '#15803d'),
     detailSection([
       { label: 'Mục đích', value: esc(d.purpose) },
-      { label: 'Người yêu cầu', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
       { label: 'Số lượng', value: `${d.passengerCount} người` },
       { label: 'Chuyến bay', value: d.flightNumber ? `<strong>${esc(d.flightNumber)}</strong>` : '' },
       { label: 'Thành viên', value: d.memberNames ? esc(d.memberNames) : '' },
@@ -755,13 +755,13 @@ export function buildConfirmManagerEmail(d: BookingEmailData): { subject: string
     detailSection([
       { label: 'Ngày và giờ', value: `${d.tripDate} | ${d.pickupTime}${d.endTime ? ' — ' + d.endTime : ''}` },
       { label: 'Mục đích', value: esc(d.purpose) },
-      { label: 'Người yêu cầu', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
-      { label: 'Tài xế', value: esc(d.driverName) || '—' },
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
+      { label: 'Tài xế phục vụ', value: d.driverName ? `Tài xế ${esc(d.driverName)}` : '—' },
       { label: 'Xe', value: d.vehicleType ? `${esc(d.vehicleType)}${d.plateNumber ? ' — ' + esc(d.plateNumber) : ''}` : '' },
       { label: 'NV phụ trách', value: d.staffInCharge ? esc(d.staffInCharge) : '' },
     ]),
     d.dashboardUrl ? ctaButtonRow('Mở bảng điều phối', d.dashboardUrl) : '',
-    footerRow('Hệ thống đã gửi email thông báo đến người yêu cầu, nhân viên phụ trách và tài xế.', d.bookingId),
+    footerRow('Hệ thống đã gửi email thông báo đến người đăng ký, nhân viên phụ trách và tài xế.', d.bookingId),
   ].join('');
 
   return { subject, html: baseWrapper(content) };
@@ -786,7 +786,7 @@ export function buildDriverRejectEmail(d: BookingEmailData): { subject: string; 
     detailSection([
       { label: 'Ngày và giờ', value: `${d.tripDate} | ${d.pickupTime}` },
       { label: 'Mục đích', value: esc(d.purpose) },
-      { label: 'Tài xế từ chối', value: esc(d.driverName) || '—' },
+      { label: 'Tài xế từ chối', value: d.driverName ? `Tài xế ${esc(d.driverName)}` : '—' },
     ]),
     d.dashboardUrl ? ctaButtonRow('Mở bảng điều phối — phân bổ lại', d.dashboardUrl, RED) : '',
     footerRow('Vui lòng phân bổ lại ngay để đảm bảo lịch di chuyển.', d.bookingId),
@@ -841,8 +841,8 @@ export function buildCancellationEmail(d: BookingEmailData & { cancelledBy: stri
     detailSection([
       { label: 'Ngày và giờ', value: `${d.tripDate} | ${d.pickupTime}` },
       { label: 'Mục đích', value: esc(d.purpose) },
-      { label: 'Người yêu cầu', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
-      { label: 'Tài xế', value: d.driverName ? esc(d.driverName) : '' },
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
+      { label: 'Tài xế phục vụ', value: d.driverName ? `Tài xế ${esc(d.driverName)}` : '' },
       { label: 'Xe', value: d.vehicleType ? `${esc(d.vehicleType)}${d.plateNumber ? ' — ' + esc(d.plateNumber) : ''}` : '' },
       { label: 'NV phụ trách', value: d.staffInCharge ? esc(d.staffInCharge) : '' },
     ]),
@@ -873,7 +873,7 @@ export function buildRejectAllEmail(d: BookingEmailData & { recipientName: strin
       { label: 'Ngày đi', value: d.tripDate },
       { label: 'Giờ đón', value: d.pickupTime },
       { label: 'Mục đích', value: esc(d.purpose) },
-      { label: 'Người yêu cầu', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} — ${esc(d.requesterDepartment)}` },
       { label: 'NV phụ trách', value: d.staffInCharge ? esc(d.staffInCharge) : '' },
     ]),
     footerRow('Nếu có thắc mắc, vui lòng liên hệ Phòng Tổng Hợp.', d.bookingId),

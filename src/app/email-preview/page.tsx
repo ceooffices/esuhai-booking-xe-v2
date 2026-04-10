@@ -68,7 +68,7 @@ const TEMPLATES = [
   },
   {
     id: 'confirm_booker',
-    name: '3. Xác nhận → Người yêu cầu',
+    name: '3. Xác nhận → Người đăng ký',
     color: '#16a34a',
     build: () => buildConfirmBookerEmail(SAMPLE),
   },
@@ -92,7 +92,7 @@ const TEMPLATES = [
   },
   {
     id: 'reject_booker',
-    name: '7. Không duyệt → Người yêu cầu',
+    name: '7. Không duyệt → Người đăng ký',
     color: '#64748b',
     build: () => buildRejectBookerEmail(SAMPLE),
   },

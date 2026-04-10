@@ -262,7 +262,7 @@ export function CalendarClient({ vehicles, bookings }: Props) {
             <div className="space-y-2 text-sm">
               <div className="flex gap-3"><span className="text-slate-400 w-24">Ngày đi</span><span className="text-slate-800">{selected.trip_date}</span></div>
               <div className="flex gap-3"><span className="text-slate-400 w-24">Giờ</span><span className="text-slate-800">{selected.pickup_time}{selected.end_time ? ' — ' + selected.end_time : ''}</span></div>
-              <div className="flex gap-3"><span className="text-slate-400 w-24">Người yêu cầu</span><span className="text-slate-800">{selected.requester_name}</span></div>
+              <div className="flex gap-3"><span className="text-slate-400 w-24">Người đăng ký</span><span className="text-slate-800">{selected.requester_name}</span></div>
               <div className="flex gap-3"><span className="text-slate-400 w-24">Phòng ban</span><span className="text-slate-800">{selected.requester_department}</span></div>
               <div className="flex gap-3"><span className="text-slate-400 w-24">Số lượng</span><span className="text-slate-800">{selected.passenger_count} người</span></div>
               {selected.driver && <div className="flex gap-3"><span className="text-slate-400 w-24">Tài xế</span><span className="text-slate-800">{selected.driver.full_name} — {selected.driver.phone}</span></div>}

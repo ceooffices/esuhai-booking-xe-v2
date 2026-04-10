@@ -86,7 +86,7 @@ function collectRecipients(
     recipients.push({ email, name });
   }
 
-  // Người yêu cầu
+  // Người đăng ký
   add(emailData.requesterEmail, `anh/chị ${emailData.requesterName}`);
   // Tài xế (nếu đã phân công)
   add(emailData.driverEmail, `anh ${emailData.driverName}`);

@@ -30,7 +30,7 @@ function DriverResponseContent() {
         setStatus('done');
         setMessage(
           finalAction === 'confirm'
-            ? 'Đã xác nhận nhận ca. Thông tin chuyến xe sẽ được gửi đến người yêu cầu và nhân viên phụ trách.'
+            ? 'Đã xác nhận nhận ca. Thông tin chuyến xe sẽ được gửi đến người đăng ký và nhân viên phụ trách.'
             : 'Đã gửi lý do từ chối. Phòng Tổng Hợp sẽ sắp xếp tài xế khác.'
         );
       } else {
