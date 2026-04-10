@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { X, Search, User } from 'lucide-react';
+
+interface StaffMember {
+  name: string;
+  department: string;
+  email: string;
+  title?: string;
+  is_manager?: boolean;
+}
 
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  staffList: StaffMember[];
 }
 
-export function CreateBookingModal({ onClose, onCreated }: Props) {
+export function CreateBookingModal({ onClose, onCreated, staffList }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState({
@@ -27,6 +36,60 @@ export function CreateBookingModal({ onClose, onCreated }: Props) {
     member_names: '',
     is_external_vehicle: false,
   });
+
+  // --- Staff Autocomplete ---
+  const [staffQuery, setStaffQuery] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [highlightIdx, setHighlightIdx] = useState(-1);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredStaff = staffQuery.length >= 1
+    ? staffList.filter(s =>
+        s.name.toLowerCase().includes(staffQuery.toLowerCase()) ||
+        s.email?.toLowerCase().includes(staffQuery.toLowerCase()) ||
+        s.department?.toLowerCase().includes(staffQuery.toLowerCase())
+      ).slice(0, 8)
+    : [];
+
+  function selectStaff(s: StaffMember) {
+    setForm(f => ({
+      ...f,
+      requester_name: s.name,
+      requester_email: s.email || '',
+      requester_department: s.department || '',
+    }));
+    setStaffQuery(s.name);
+    setShowDropdown(false);
+    setHighlightIdx(-1);
+  }
+
+  function handleStaffKeyDown(e: React.KeyboardEvent) {
+    if (!showDropdown || filteredStaff.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlightIdx(i => Math.min(i + 1, filteredStaff.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlightIdx(i => Math.max(i - 1, 0));
+    } else if (e.key === 'Enter' && highlightIdx >= 0) {
+      e.preventDefault();
+      selectStaff(filteredStaff[highlightIdx]);
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+    }
+  }
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   function set(key: string, value: unknown) {
     setForm(f => ({ ...f, [key]: value }));
@@ -55,10 +118,8 @@ export function CreateBookingModal({ onClose, onCreated }: Props) {
     setLoading(false);
   }
 
-  const DEPARTMENTS = [
-    'MSA', 'Nhân sự', 'Kế toán', 'Đào tạo', 'Kinh doanh', 'IT',
-    'Hành chính', 'Marketing', 'Phòng Tổng Hợp', 'Ban Giám đốc',
-  ];
+  // Lấy danh sách phòng ban duy nhất từ staff list
+  const departments = [...new Set(staffList.map(s => s.department).filter(Boolean))].sort();
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
@@ -73,29 +134,84 @@ export function CreateBookingModal({ onClose, onCreated }: Props) {
         </div>
 
         <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5">
-          {/* Người yêu cầu */}
+          {/* Người yêu cầu — Autocomplete */}
           <div className="space-y-4">
-            <h3 className="text-base font-bold text-slate-700">Người yêu cầu</h3>
-            <div>
+            <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
+              <User size={16} className="text-blue-500" />
+              Người yêu cầu
+            </h3>
+
+            {/* Autocomplete input */}
+            <div className="relative" ref={dropdownRef}>
               <label className="block text-sm font-semibold text-slate-600 mb-1.5">Họ và tên</label>
-              <input value={form.requester_name} onChange={e => set('requester_name', e.target.value)} required
-                placeholder="Nguyễn Văn A"
-                className="w-full px-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none" />
+              <div className="relative">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={inputRef}
+                  value={staffQuery}
+                  onChange={e => {
+                    const v = e.target.value;
+                    setStaffQuery(v);
+                    set('requester_name', v);
+                    setShowDropdown(v.length >= 1);
+                    setHighlightIdx(-1);
+                  }}
+                  onFocus={() => { if (staffQuery.length >= 1) setShowDropdown(true); }}
+                  onKeyDown={handleStaffKeyDown}
+                  required
+                  placeholder="Gõ tên nhân viên để tìm..."
+                  autoComplete="off"
+                  className="w-full pl-10 pr-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
+
+              {/* Dropdown */}
+              {showDropdown && filteredStaff.length > 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                  {filteredStaff.map((s, i) => (
+                    <button
+                      key={`${s.email}-${i}`}
+                      type="button"
+                      onClick={() => selectStaff(s)}
+                      className={`w-full px-4 py-3 text-left flex flex-col gap-0.5 transition min-h-0 ${
+                        i === highlightIdx ? 'bg-blue-50' : 'hover:bg-slate-50'
+                      } ${i > 0 ? 'border-t border-slate-100' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-800 text-sm">{s.name}</span>
+                        {s.is_manager && (
+                          <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">QL</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {s.department}{s.title ? ` · ${s.title}` : ''} · {s.email}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {showDropdown && staffQuery.length >= 1 && filteredStaff.length === 0 && (
+                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg p-4 text-center text-sm text-slate-400">
+                  Không tìm thấy nhân viên &quot;{staffQuery}&quot;
+                </div>
+              )}
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1.5">Phòng ban</label>
                 <select value={form.requester_department} onChange={e => set('requester_department', e.target.value)} required
                   className="w-full px-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none">
                   <option value="">— Chọn —</option>
-                  {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+                  {departments.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1.5">Email</label>
                 <input type="email" value={form.requester_email} onChange={e => set('requester_email', e.target.value)}
                   placeholder="email@esuhai.com"
-                  className="w-full px-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none" />
+                  className="w-full px-4 py-3.5 rounded-xl border border-slate-300 text-base focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50" readOnly={!!form.requester_email && staffList.some(s => s.email === form.requester_email)} />
               </div>
             </div>
           </div>

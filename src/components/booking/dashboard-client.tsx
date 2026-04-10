@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Send } from 'lucide-react';
+import { Send, Plus } from 'lucide-react';
 import { BookingCard } from './booking-card';
 import { BookingDetailModal } from './booking-detail-modal';
 import { SendFormModal } from './send-form-modal';
+import { CreateBookingModal } from './create-booking-modal';
 import { FadeIn, StaggerList, StaggerItem, CountUp, ToastAnimation, PageTransition } from '@/components/ui/animations';
 import { approveBooking, rejectBooking, assignDriverVehicle, cancelBooking, completeTrip, savePostTrip, savePostTripCost } from '@/lib/actions';
 import { useRouter } from 'next/navigation';
@@ -55,7 +56,7 @@ interface Props {
   vehicles: Vehicle[];
   userEmail: string;
   stats: { pending: number; approved: number; waiting: number; rejected: number; today: number };
-  staffList: { name: string; department: string; email: string }[];
+  staffList: { name: string; department: string; email: string; title?: string; is_manager?: boolean }[];
   formUrl: string;
 }
 
@@ -64,6 +65,7 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateBooking, setShowCreateBooking] = useState(false);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
@@ -152,6 +154,11 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
     <PageTransition className="space-y-5">
       {/* Thanh tiện ích */}
       <div className="flex items-center gap-2">
+        <button onClick={() => setShowCreateBooking(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition min-h-0 shrink-0 shadow-sm">
+          <Plus size={14} />
+          Tạo yêu cầu
+        </button>
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition min-h-0 shrink-0">
           <Send size={14} />
@@ -225,6 +232,19 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
           vehicles={vehicles}
           onClose={() => setSelectedId(null)}
           onAction={handleAction}
+        />
+      )}
+
+      {/* Tạo yêu cầu mới */}
+      {showCreateBooking && (
+        <CreateBookingModal
+          staffList={staffList}
+          onClose={() => setShowCreateBooking(false)}
+          onCreated={() => {
+            setShowCreateBooking(false);
+            showToast('Đã tạo yêu cầu thành công');
+            startTransition(() => router.refresh());
+          }}
         />
       )}
 
