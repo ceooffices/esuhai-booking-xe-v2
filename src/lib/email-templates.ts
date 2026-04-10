@@ -164,11 +164,14 @@ function headerBlock(title: string, subtitle: string, accentColor: string = BLUE
 // PROCESS BAR — 4 bước (Content Bible §IV)
 // ============================================================
 
-const STEPS = ['Tiếp nhận', 'Phân bổ', 'TX xác nhận', 'Sẵn sàng'];
+// 5 bước theo Flow Book Xe.pdf:
+// 1. Tiếp nhận → 2. Phân bổ → 3. Xác nhận → 4. Phục vụ → 5. Hoàn thành
+const STEPS = ['Tiếp nhận', 'Phân bổ', 'Xác nhận', 'Phục vụ', 'Hoàn thành'];
+const STEP_COUNT = STEPS.length;
 
 function processBar(activeStep: number): string {
   let html = '';
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < STEP_COUNT; i++) {
     const isDone = i < activeStep;
     const isActive = i === activeStep;
 
@@ -177,14 +180,14 @@ function processBar(activeStep: number): string {
     let labelWeight = '500';
 
     if (isDone) {
-      circleStyle = `width:24px;height:24px;background-color:${GREEN};color:#fff;font-size:12px;font-family:${F};font-weight:700;text-align:center;line-height:24px;border-radius:12px;`;
+      circleStyle = `width:22px;height:22px;background-color:${GREEN};color:#fff;font-size:11px;font-family:${F};font-weight:700;text-align:center;line-height:22px;border-radius:11px;`;
       labelColor = '#15803d';
     } else if (isActive) {
-      circleStyle = `width:24px;height:24px;background-color:${BLUE};color:#fff;font-size:12px;font-family:${F};font-weight:700;text-align:center;line-height:24px;border-radius:12px;`;
+      circleStyle = `width:22px;height:22px;background-color:${BLUE};color:#fff;font-size:11px;font-family:${F};font-weight:700;text-align:center;line-height:22px;border-radius:11px;`;
       labelColor = BLUE;
       labelWeight = '700';
     } else {
-      circleStyle = `width:24px;height:24px;background-color:#e2e8f0;color:#94a3b8;font-size:12px;font-family:${F};font-weight:600;text-align:center;line-height:24px;border-radius:12px;`;
+      circleStyle = `width:22px;height:22px;background-color:#e2e8f0;color:#94a3b8;font-size:11px;font-family:${F};font-weight:600;text-align:center;line-height:22px;border-radius:11px;`;
       labelColor = '#94a3b8';
     }
 
@@ -193,19 +196,19 @@ function processBar(activeStep: number): string {
 
     // Connector line before step (except first)
     if (i > 0) {
-      html += `<!--[if mso]><td width="40" valign="middle"><![endif]--><!--[if !mso]><!--><td valign="middle" style="padding:0;"><!--<![endif]-->
+      html += `<!--[if mso]><td width="30" valign="middle"><![endif]--><!--[if !mso]><!--><td valign="middle" style="padding:0;"><!--<![endif]-->
 <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0"><tr><td height="2" bgcolor="${lineColor}" style="font-size:0;line-height:0;">&nbsp;</td></tr></table>
 </td>`;
     }
 
-    html += `<td width="25%" align="center" valign="top" style="padding:0;">
+    html += `<td width="20%" align="center" valign="top" style="padding:0;">
 <div style="${circleStyle}">${circleContent}</div>
-<p style="margin:6px 0 0;font-size:10px;font-family:${F};color:${labelColor};font-weight:${labelWeight};line-height:1.3;text-align:center;white-space:nowrap;">${STEPS[i]}</p>
+<p style="margin:5px 0 0;font-size:9px;font-family:${F};color:${labelColor};font-weight:${labelWeight};line-height:1.2;text-align:center;white-space:nowrap;">${STEPS[i]}</p>
 </td>`;
   }
 
   return `
-<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:16px 24px 20px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+<tr><td bgcolor="#ffffff" style="background-color:#ffffff;padding:16px 20px 20px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
 <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
 <tr>${html}</tr>
 </table>
@@ -674,7 +677,7 @@ export function buildConfirmBookerEmail(d: BookingEmailData): { subject: string;
 
   const content = [
     headerBlock('Chuyến xe đã được xác nhận', 'Xe đã phân bổ — Sẵn sàng phục vụ', GREEN),
-    processBar(3),
+    processBar(2),
     badgeRow(d.bookingId),
     greetingRow(
       `Kính gửi ${vnGreeting(d.requesterName, d.requesterGender)},`,
@@ -708,7 +711,7 @@ export function buildConfirmStaffEmail(d: BookingEmailData): { subject: string; 
 
   const content = [
     headerBlock('Thông tin chuyến xe đã xác nhận', 'Ban Điều Phối — Esuhai Group', GREEN),
-    processBar(3),
+    processBar(2),
     badgeRow(d.bookingId),
     greetingRow(
       `Kính gửi ${vnGreeting(d.staffInCharge || '', d.staffInChargeGender)},`,
@@ -742,7 +745,7 @@ export function buildConfirmManagerEmail(d: BookingEmailData): { subject: string
 
   const content = [
     headerBlock('Quy trình phân bổ hoàn tất', 'Phòng Tổng Hợp — Esuhai Group', GREEN),
-    processBar(3),
+    processBar(3),  // Step 4: Phục vụ — chuyến xe sẵn sàng, chờ thực hiện
     badgeRow(d.bookingId),
     greetingRow(
       `Kính gửi ${vnGreeting(d.managerName || '', d.managerGender)},`,
@@ -773,7 +776,7 @@ export function buildDriverRejectEmail(d: BookingEmailData): { subject: string; 
 
   const content = [
     headerBlock('Cần phân bổ tài xế khác', 'Yêu Cầu Thay Đổi Phân Bổ', RED),
-    processBar(2),
+    processBar(1),  // Quay lại bước Phân bổ
     badgeRow(d.bookingId),
     greetingRow(
       `Kính gửi ${vnGreeting(d.managerName || '', d.managerGender)},`,
