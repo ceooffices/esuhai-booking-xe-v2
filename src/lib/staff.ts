@@ -48,15 +48,64 @@ export async function lookupStaffByEmail(email: string | null | undefined): Prom
   return normalize(data as StaffRow | null);
 }
 
-// Tìm theo tên đầy đủ (case-sensitive — staff table thường lưu chuẩn).
-// Trả null nếu không có hoặc tên trùng nhiều người (maybeSingle).
+// Tìm theo tên — dùng cho data từ Google Form (user gõ tay → có thể
+// thiếu/dư khoảng trắng, khác hoa-thường, viết tắt, ...).
+//
+// Multi-tier fallback (dừng ở lần match đầu tiên):
+//   1. Trim + match case-insensitive đầy đủ (vd "thúy hà" = "Thúy Hà")
+//   2. Substring contains 2 chiều — staff name CHỨA query, hoặc query
+//      CHỨA staff name (vd "Thúy Hà" tìm thấy "Lê Thị Thúy Hà").
+//      Ngưỡng tối thiểu 5 ký tự để tránh khớp tùm lum tên ngắn.
+//
+// Nếu match nhiều người → trả null + log warning (an toàn hơn gửi nhầm).
 export async function lookupStaffByName(name: string | null | undefined): Promise<StaffInfo | null> {
   if (!name) return null;
+  const trimmed = name.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return null;
   const admin = createAdminClient();
-  const { data } = await admin
+
+  // Tier 1: exact case-insensitive match
+  const { data: exact } = await admin
     .from('staff')
     .select('name, email, gender, department, is_manager')
-    .eq('name', name)
-    .maybeSingle();
-  return normalize(data as StaffRow | null);
+    .ilike('name', trimmed)
+    .limit(2);
+  if (exact && exact.length === 1) {
+    return normalize(exact[0] as StaffRow);
+  }
+  if (exact && exact.length > 1) {
+    console.warn(`[staff] lookupByName "${trimmed}": match ${exact.length} người (exact ilike). Trả null an toàn.`);
+    return null;
+  }
+
+  // Tier 2: substring 2-way (chỉ áp dụng khi name đủ dài để tránh false match)
+  if (trimmed.length < 5) {
+    return null;
+  }
+  // Escape % và _ trong query (postgres LIKE wildcards)
+  const escaped = trimmed.replace(/[%_]/g, '\\$&');
+  const { data: partial } = await admin
+    .from('staff')
+    .select('name, email, gender, department, is_manager')
+    .or(`name.ilike.%${escaped}%,name.ilike.${escaped}%,name.ilike.%${escaped}`)
+    .limit(5);
+
+  if (!partial || partial.length === 0) return null;
+
+  // Lọc thêm: 2-way contains (staff.name chứa query OR query chứa staff.name)
+  const lcQuery = trimmed.toLowerCase();
+  const candidates = partial.filter(p => {
+    const sName = ((p as StaffRow).name || '').toLowerCase();
+    return sName.includes(lcQuery) || lcQuery.includes(sName);
+  });
+
+  if (candidates.length === 1) {
+    console.warn(`[staff] lookupByName "${trimmed}": fuzzy match → "${(candidates[0] as StaffRow).name}"`);
+    return normalize(candidates[0] as StaffRow);
+  }
+  if (candidates.length > 1) {
+    console.warn(`[staff] lookupByName "${trimmed}": fuzzy match ${candidates.length} người. Trả null an toàn.`);
+    return null;
+  }
+  return null;
 }
