@@ -15,7 +15,7 @@ import type { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email';
 import { buildApprovalRequestEmail } from '@/lib/email-templates';
 import { signDriverToken } from '@/lib/tokens';
-import { lookupStaffByEmail } from '@/lib/staff';
+import { lookupStaffByEmail, lookupStaffByName } from '@/lib/staff';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -32,6 +32,19 @@ export async function getBookingEmailData(supabase: AdminClient, bookingId: stri
   // Token HMAC ký (bookingId + driverId + expiresEpoch=now+14d)
   const driverToken = b.driver_id ? signDriverToken(b.id, b.driver_id) : '';
 
+  // Fallback: nếu booking không có requester_email (form submit thiếu,
+  // hoặc Google Form không có field email) → lookup theo requester_name
+  // trong staff table. Đảm bảo người đăng ký luôn nhận được email
+  // confirm/cancel/reject về booking của mình.
+  let requesterEmail = (b.requester_email as string | null) || null;
+  if (!requesterEmail && b.requester_name) {
+    const found = await lookupStaffByName(b.requester_name as string);
+    if (found?.email) {
+      requesterEmail = found.email;
+      console.warn(`[booking-emails] Booking ${b.id} thiếu requester_email — fallback lookup theo tên "${b.requester_name}" → ${requesterEmail}`);
+    }
+  }
+
   return {
     bookingId: b.id as string,
     purpose: b.purpose as string,
@@ -43,7 +56,7 @@ export async function getBookingEmailData(supabase: AdminClient, bookingId: stri
     passengerCount: b.passenger_count as number,
     requesterName: b.requester_name as string,
     requesterDepartment: b.requester_department as string,
-    requesterEmail: b.requester_email as string | null,
+    requesterEmail,
     staffInCharge: b.staff_in_charge as string | undefined,
     flightNumber: b.flight_number as string | undefined,
     memberNames: b.member_names as string | undefined,

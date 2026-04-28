@@ -93,38 +93,51 @@ export async function POST(request: Request) {
       //   1. QUẢN LÝ        → buildConfirmManagerEmail  ("Hoàn tất")
       //   2. NGƯỜI ĐĂNG KÝ  → buildConfirmBookerEmail   ("Xe đã sẵn sàng")
       //   3. NV PHỤ TRÁCH   → buildConfirmStaffEmail    ("Lịch xe đã xác nhận")
-      // Dedupe: nếu cùng email, chỉ gửi 1 lần (theo template ưu tiên: manager > booker > staff).
+      //
+      // Dedup theo template (mỗi template gửi tối đa 1 lần) — KHÔNG dedup
+      // theo email. Nếu 1 người ở 2 vai trò (vd Hà = manager + booker)
+      // họ vẫn nhận 2 email khác content khác mục đích — manager email
+      // gửi cho group hanhchanh@ (báo "hoàn tất"), booker email gửi cho
+      // email cá nhân (kèm SĐT tài xế để gọi khi cần).
       const emailData = await getBookingEmailData(supabase, booking_id);
       if (emailData) {
         const config = await getEmailConfig(supabase);
-        const sentToEmails = new Set<string>();
+        const sentTemplates = new Set<string>();
 
-        async function sendOnce(to: string | null | undefined, templateName: string, build: () => { subject: string; html: string }) {
-          if (!to || sentToEmails.has(to)) return;
-          sentToEmails.add(to);
+        async function sendByTemplate(to: string | null | undefined, templateName: string, build: () => { subject: string; html: string }) {
+          if (!to) {
+            console.warn(`[driver-response/confirm] Bỏ qua ${templateName}: không có email người nhận. Booking ${booking_id}.`);
+            return;
+          }
+          if (sentTemplates.has(templateName)) return;
+          sentTemplates.add(templateName);
           const tpl = build();
           const result = await sendEmail({ to, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
           await logEmail(supabase, booking_id, templateName, to, tpl.subject, result.success, result.error);
+          if (!result.success) {
+            console.error(`[driver-response/confirm] Gửi ${templateName} → ${to} FAIL:`, result.error);
+          }
         }
 
-        // 1. QUẢN LÝ — luôn nhận thông báo "Hoàn tất" (fix bug chị Hà)
+        // 1. QUẢN LÝ — luôn nhận "Hoàn tất"
         const managerInfo = await lookupStaffByEmail(config.manager_email);
-        await sendOnce(config.manager_email, 'confirm_manager', () => buildConfirmManagerEmail({
+        await sendByTemplate(config.manager_email, 'confirm_manager', () => buildConfirmManagerEmail({
           ...emailData,
           managerName: managerInfo?.name || config.manager_name || '',
           managerGender: managerInfo?.gender || undefined,
         }));
 
-        // 2. NGƯỜI ĐĂNG KÝ — chỉ gửi khi khác manager
+        // 2. NGƯỜI ĐĂNG KÝ — emailData.requesterEmail đã được hydrate
+        // bởi getBookingEmailData (fallback lookup theo tên nếu DB null).
         const requesterInfo = await lookupStaffByEmail(emailData.requesterEmail);
-        await sendOnce(emailData.requesterEmail, 'confirm_booker', () => buildConfirmBookerEmail({
+        await sendByTemplate(emailData.requesterEmail, 'confirm_booker', () => buildConfirmBookerEmail({
           ...emailData,
           requesterGender: requesterInfo?.gender || undefined,
         }));
 
         // 3. NV PHỤ TRÁCH — lookup theo tên trong staff table
         const staffInfo = await lookupStaffByName(emailData.staffInCharge);
-        await sendOnce(staffInfo?.email, 'confirm_staff', () => buildConfirmStaffEmail({
+        await sendByTemplate(staffInfo?.email, 'confirm_staff', () => buildConfirmStaffEmail({
           ...emailData,
           staffInChargeGender: staffInfo?.gender || undefined,
         }));
