@@ -1,18 +1,11 @@
 'use server';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email';
 import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail, buildNewBookingEmail } from '@/lib/email-templates';
 import { signDriverToken, verifyEvalToken } from '@/lib/tokens';
+import { requireManagerRole } from '@/lib/auth';
 import type { BookingStatus } from '@/types/database';
-
-async function requireAuthUserEmail() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || !user.email) throw new Error('Unauthorized');
-  return user.email;
-}
 
 // Helper: lấy booking data cho email template
 async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient>, bookingId: string) {
@@ -103,14 +96,15 @@ function collectRecipients(
 }
 
 // --- Approve Booking (handles multi-level) ---
-export async function approveBooking(bookingId: string, clientApproverEmail?: string) {
-  let approverEmail = clientApproverEmail || '';
+export async function approveBooking(bookingId: string) {
+  let approverEmail: string;
   try {
-    approverEmail = await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    const role = await requireManagerRole();
+    approverEmail = role.email;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
-  
+
   const supabase = createAdminClient();
 
   const { data: booking, error } = await supabase
@@ -168,12 +162,13 @@ export async function approveBooking(bookingId: string, clientApproverEmail?: st
 }
 
 // --- Reject Booking ---
-export async function rejectBooking(bookingId: string, clientRejectedBy: string, reason: string) {
-  let rejectedBy = clientRejectedBy;
+export async function rejectBooking(bookingId: string, reason: string) {
+  let rejectedBy: string;
   try {
-    rejectedBy = await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    const role = await requireManagerRole();
+    rejectedBy = role.email;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
 
   const supabase = createAdminClient();
@@ -206,9 +201,9 @@ export async function rejectBooking(bookingId: string, clientRejectedBy: string,
 // --- Assign Driver + Vehicle ---
 export async function assignDriverVehicle(bookingId: string, driverId: string, vehicleId: string) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
 
@@ -244,12 +239,13 @@ export async function assignDriverVehicle(bookingId: string, driverId: string, v
 }
 
 // --- Cancel Booking (bắt buộc lý do + thông báo toàn bộ) ---
-export async function cancelBooking(bookingId: string, clientCancelledBy: string, reason: string) {
-  let cancelledBy = clientCancelledBy;
+export async function cancelBooking(bookingId: string, reason: string) {
+  let cancelledBy: string;
   try {
-    cancelledBy = await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    const role = await requireManagerRole();
+    cancelledBy = role.email;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
 
   const supabase = createAdminClient();
@@ -290,9 +286,9 @@ export async function cancelBooking(bookingId: string, clientCancelledBy: string
 // --- Complete Trip ---
 export async function completeTrip(bookingId: string) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
 
@@ -311,9 +307,9 @@ export async function saveDriver(id: string | null, data: {
   vehicle_types_can_drive: string[]; is_available: boolean;
 }) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
   const payload = {
@@ -340,9 +336,9 @@ export async function saveVehicle(id: string | null, data: {
   seat_count: number; purchase_date: string; is_available: boolean;
 }) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
   const payload = {
@@ -367,9 +363,9 @@ export async function savePostTrip(bookingId: string, data: {
   total_km: number; overnight_hours: number;
 }, userId: string) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
   const { error } = await supabase.from('post_trips').upsert({
@@ -389,9 +385,9 @@ export async function savePostTripCost(postTripId: string, bookingId: string, da
   cost_category: string; description: string; amount: number;
 }) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
 
@@ -455,9 +451,9 @@ export async function submitEvaluation(bookingId: string, data: {
 // --- Update System Config ---
 export async function updateConfig(key: string, value: string) {
   try {
-    await requireAuthUserEmail();
-  } catch {
-    return { error: 'Unauthorized' };
+    await requireManagerRole();
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
   }
   const supabase = createAdminClient();
   const { error } = await supabase.from('system_config')

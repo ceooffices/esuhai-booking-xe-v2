@@ -114,11 +114,11 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
 
     switch (action) {
       case 'approve':
-        result = await approveBooking(selectedId, userEmail);
+        result = await approveBooking(selectedId);
         if (result.success) showToast('Đã duyệt yêu cầu');
         break;
       case 'reject':
-        result = await rejectBooking(selectedId, userEmail, data?.reason || '');
+        result = await rejectBooking(selectedId, data?.reason || '');
         if (result.success) showToast('Đã từ chối yêu cầu');
         break;
       case 'assign':
@@ -127,7 +127,7 @@ export function DashboardClient({ bookings, drivers, vehicles, userEmail, stats,
         break;
       case 'cancel':
         if (!data?.reason?.trim()) { showToast('Vui lòng nhập lý do huỷ chuyến'); return; }
-        result = await cancelBooking(selectedId, userEmail, data.reason);
+        result = await cancelBooking(selectedId, data.reason);
         if (result.success) showToast('Đã huỷ chuyến. Thông báo đã gửi cho toàn bộ thành viên.');
         break;
       case 'complete':
