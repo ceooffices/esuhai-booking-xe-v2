@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email';
-import { buildConfirmBookerEmail, buildDriverRejectEmail } from '@/lib/email-templates';
+import {
+  buildConfirmBookerEmail,
+  buildConfirmStaffEmail,
+  buildConfirmManagerEmail,
+  buildDriverRejectEmail,
+} from '@/lib/email-templates';
 
 // Helper: lấy booking data cho email
 async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient>, bookingId: string) {
@@ -45,10 +50,31 @@ async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient
 // Helper: lấy email config
 async function getEmailConfig(supabase: ReturnType<typeof createAdminClient>) {
   const { data } = await supabase.from('system_config').select('key, value')
-    .in('key', ['manager_email', 'always_cc']);
+    .in('key', ['manager_email', 'manager_name', 'always_cc']);
   const config: Record<string, string> = {};
   data?.forEach(c => { config[c.key] = c.value; });
   return config;
+}
+
+// Helper: lookup staff by email/name → trả về name, gender, is_manager
+type StaffInfo = { name: string; email: string | null; gender: 'male' | 'female' | null; is_manager: boolean };
+
+async function lookupStaffByEmail(supabase: ReturnType<typeof createAdminClient>, email: string | null | undefined): Promise<StaffInfo | null> {
+  if (!email) return null;
+  const { data } = await supabase.from('staff')
+    .select('name, email, gender, is_manager')
+    .eq('email', email)
+    .maybeSingle();
+  return (data as StaffInfo | null) || null;
+}
+
+async function lookupStaffByName(supabase: ReturnType<typeof createAdminClient>, name: string | null | undefined): Promise<StaffInfo | null> {
+  if (!name) return null;
+  const { data } = await supabase.from('staff')
+    .select('name, email, gender, is_manager')
+    .eq('name', name)
+    .maybeSingle();
+  return (data as StaffInfo | null) || null;
 }
 
 // Helper: log email
@@ -107,24 +133,45 @@ export async function POST(request: Request) {
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-      // Gửi email xác nhận chuyến xe cho người đăng ký + CC quản lý
+      // Gửi email xác nhận sau khi tài xế nhận ca:
+      //   1. QUẢN LÝ        → buildConfirmManagerEmail  ("Hoàn tất")
+      //   2. NGƯỜI ĐĂNG KÝ  → buildConfirmBookerEmail   ("Xe đã sẵn sàng")
+      //   3. NV PHỤ TRÁCH   → buildConfirmStaffEmail    ("Lịch xe đã xác nhận")
+      // Dedupe: nếu cùng email, chỉ gửi 1 lần (theo template ưu tiên: manager > booker > staff).
       const emailData = await getBookingEmailData(supabase, booking_id);
       if (emailData) {
         const config = await getEmailConfig(supabase);
+        const sentToEmails = new Set<string>();
 
-        // Email cho người đăng ký (Xe đã sẵn sàng)
-        if (emailData.requesterEmail) {
-          const tpl = buildConfirmBookerEmail(emailData);
-          const result = await sendEmail({ to: emailData.requesterEmail, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
-          await logEmail(supabase, booking_id, 'confirm_booker', emailData.requesterEmail, tpl.subject, result.success, result.error);
+        async function sendOnce(to: string | null | undefined, templateName: string, build: () => { subject: string; html: string }) {
+          if (!to || sentToEmails.has(to)) return;
+          sentToEmails.add(to);
+          const tpl = build();
+          const result = await sendEmail({ to, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
+          await logEmail(supabase, booking_id, templateName, to, tpl.subject, result.success, result.error);
         }
 
-        // Email cho quản lý (same template)
-        if (config.manager_email && config.manager_email !== emailData.requesterEmail) {
-          const tpl = buildConfirmBookerEmail(emailData);
-          const result = await sendEmail({ to: config.manager_email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
-          await logEmail(supabase, booking_id, 'confirm_manager', config.manager_email, tpl.subject, result.success, result.error);
-        }
+        // 1. QUẢN LÝ — luôn nhận thông báo "Hoàn tất" (fix bug chị Hà)
+        const managerInfo = await lookupStaffByEmail(supabase, config.manager_email);
+        await sendOnce(config.manager_email, 'confirm_manager', () => buildConfirmManagerEmail({
+          ...emailData,
+          managerName: managerInfo?.name || config.manager_name || '',
+          managerGender: managerInfo?.gender || undefined,
+        }));
+
+        // 2. NGƯỜI ĐĂNG KÝ — chỉ gửi khi khác manager
+        const requesterInfo = await lookupStaffByEmail(supabase, emailData.requesterEmail);
+        await sendOnce(emailData.requesterEmail, 'confirm_booker', () => buildConfirmBookerEmail({
+          ...emailData,
+          requesterGender: requesterInfo?.gender || undefined,
+        }));
+
+        // 3. NV PHỤ TRÁCH — lookup theo tên trong staff table
+        const staffInfo = await lookupStaffByName(supabase, emailData.staffInCharge);
+        await sendOnce(staffInfo?.email, 'confirm_staff', () => buildConfirmStaffEmail({
+          ...emailData,
+          staffInChargeGender: staffInfo?.gender || undefined,
+        }));
       }
 
       return NextResponse.json({ success: true });
