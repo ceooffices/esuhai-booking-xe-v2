@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
-// Verify webhook secret before processing
+// Verify webhook secret before processing.
+// FAIL-CLOSED: nếu WEBHOOK_SECRET chưa cấu hình → từ chối mọi request.
+// Trước đây trả true (backward compat) → ai biết URL cũng tạo được booking
+// ẩn danh, spam email duyệt. P0 đã fix.
 function verifyWebhookAuth(request: Request): boolean {
-  const secret = request.headers.get('x-webhook-secret') || request.headers.get('authorization')?.replace('Bearer ', '');
   const expectedSecret = process.env.WEBHOOK_SECRET;
-
-  // If no WEBHOOK_SECRET configured, allow (backward compatible, but log warning)
-  if (!expectedSecret) return true;
-
+  if (!expectedSecret) {
+    console.error('[webhook/google-form] WEBHOOK_SECRET chưa set → từ chối request. Set env var trên Vercel để webhook hoạt động.');
+    return false;
+  }
+  const secret = request.headers.get('x-webhook-secret') || request.headers.get('authorization')?.replace('Bearer ', '');
   return secret === expectedSecret;
 }
 
