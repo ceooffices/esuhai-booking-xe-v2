@@ -634,6 +634,77 @@ export function buildNewBookingEmail(d: BookingEmailData): { subject: string; ht
 }
 
 // ============================================================
+// TEMPLATE 1b: YÊU CẦU CHỜ DUYỆT → APPROVER CẤP 1/2/3
+// Gửi khi:
+//   - Webhook tạo booking mới → notify approver_l1
+//   - approveBooking chuyển sang cho_duyet_cap2 → notify approver_l2
+//   - approveBooking chuyển sang cho_duyet_cap3 → notify approver_l3
+// ============================================================
+
+export function buildApprovalRequestEmail(d: BookingEmailData & {
+  approverLevel: 1 | 2 | 3;
+  approverName?: string;
+  approverGender?: 'male' | 'female';
+  totalLevels: number; // 1 cho xe cơ hữu, 3 cho xe ngoài
+}): { subject: string; html: string } {
+  const subject = d.approverLevel === 1
+    ? `[Yêu cầu xe mới — cần duyệt] ${d.purpose} — ${d.tripDate}`
+    : `[Chờ duyệt cấp ${d.approverLevel}] ${d.purpose} — ${d.tripDate}`;
+
+  const headerTitle = d.approverLevel === 1
+    ? 'Yêu cầu sử dụng xe mới — cần duyệt'
+    : `Yêu cầu cần duyệt cấp ${d.approverLevel}`;
+
+  const headerSub = d.totalLevels > 1
+    ? `Cấp ${d.approverLevel} / ${d.totalLevels} — Phòng Tổng Hợp Esuhai Group`
+    : 'Phòng Tổng Hợp — Esuhai Group';
+
+  const intro = d.approverLevel === 1
+    ? `Hệ thống vừa tiếp nhận một yêu cầu sử dụng xe mới. Vui lòng xem xét và quyết định duyệt hoặc không duyệt.`
+    : `Yêu cầu sử dụng xe đã qua cấp duyệt trước. Vui lòng xem xét và quyết định duyệt cấp ${d.approverLevel}${d.approverLevel === d.totalLevels ? ' (cấp cuối cùng)' : ''}.`;
+
+  const timeStr = `${d.pickupTime}${d.endTime ? ' — ' + d.endTime : ''}`;
+  const accentColor = d.approverLevel === d.totalLevels ? GREEN : BLUE;
+
+  const content = [
+    headerBlock(headerTitle, headerSub, accentColor),
+    processBar(0),  // vẫn ở bước Tiếp nhận / Duyệt
+    badgeRow(d.bookingId),
+    greetingRow(
+      `Kính gửi ${vnGreeting(d.approverName || '', d.approverGender)},`,
+      intro
+    ),
+    splitInfoCard(
+      'Ngày và giờ đón', timeStr, d.tripDate,
+      [
+        { label: 'Phân loại', value: categoryBadge(d.category) },
+        { label: 'Số lượng', value: `${d.passengerCount} người` },
+        { label: 'NV phụ trách', value: d.staffInCharge ? `<span style="color:#3b82f6;">${esc(d.staffInCharge)}</span>` : '—' },
+      ]
+    ),
+    ticketDivider(),
+    detailSection([
+      { label: 'Người đăng ký', value: `${esc(d.requesterName)} <span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:3px 8px;">${esc(d.requesterDepartment)}</span>` },
+      { label: 'Mục đích', value: esc(d.purpose) },
+      { label: 'Chuyến bay', value: d.flightNumber ? `<strong>${esc(d.flightNumber)}</strong>` : '' },
+      { label: 'Thành viên', value: d.memberNames ? esc(d.memberNames) : '' },
+    ]),
+    d.itinerary ? timelineRow(d.itinerary) : '',
+    d.dashboardUrl ? ctaButtonRow('Mở bảng điều phối — Duyệt yêu cầu', d.dashboardUrl, accentColor) : '',
+    footerRow(
+      d.totalLevels === 1
+        ? 'Sau khi duyệt, hệ thống sẽ thông báo Phòng Tổng Hợp để phân bổ tài xế.'
+        : d.approverLevel === d.totalLevels
+          ? 'Đây là cấp duyệt cuối. Sau khi duyệt, hệ thống sẽ thông báo Phòng Tổng Hợp để phân bổ tài xế.'
+          : `Sau khi duyệt, yêu cầu sẽ chuyển sang cấp ${d.approverLevel + 1} để duyệt tiếp.`,
+      d.bookingId
+    ),
+  ].join('');
+
+  return { subject, html: baseWrapper(content) };
+}
+
+// ============================================================
 // TEMPLATE 2: PHÂN CÔNG → TÀI XẾ (Step 2 active)
 // ============================================================
 

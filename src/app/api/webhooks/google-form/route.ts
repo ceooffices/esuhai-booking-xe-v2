@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getEmailConfig, notifyApprover } from '@/lib/booking-emails';
 
 // Verify webhook secret before processing.
 // FAIL-CLOSED: nếu WEBHOOK_SECRET chưa cấu hình → từ chối mọi request.
@@ -67,6 +68,16 @@ export async function POST(request: Request) {
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    // Gửi email "Yêu cầu xe mới — cần duyệt" cho approver cấp 1.
+    // Không block response: gửi best-effort, lỗi chỉ log vào email_logs.
+    try {
+      const config = await getEmailConfig(supabase);
+      const totalLevels = isExternal ? 3 : 1;
+      await notifyApprover(supabase, data.id, 1, totalLevels, config);
+    } catch (e) {
+      console.error('[webhook/google-form] notifyApprover lỗi:', e);
     }
 
     return NextResponse.json({ success: true, booking_id: data.id });

@@ -2,98 +2,23 @@
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email';
-import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail, buildNewBookingEmail } from '@/lib/email-templates';
-import { signDriverToken, verifyEvalToken } from '@/lib/tokens';
+import {
+  buildCancellationEmail,
+  buildDriverAssignEmail,
+  buildNewBookingEmail,
+  buildRejectAllEmail,
+} from '@/lib/email-templates';
+import { verifyEvalToken } from '@/lib/tokens';
 import { requireManagerRole } from '@/lib/auth';
+import { lookupStaffByEmail } from '@/lib/staff';
+import {
+  collectRecipients,
+  getBookingEmailData,
+  getEmailConfig,
+  logEmail,
+  notifyApprover,
+} from '@/lib/booking-emails';
 import type { BookingStatus } from '@/types/database';
-
-// Helper: lấy booking data cho email template
-async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient>, bookingId: string) {
-  const { data: b } = await supabase.from('bookings').select(`
-    *, driver:drivers(full_name, phone, email), vehicle:vehicles(plate_number, vehicle_type)
-  `).eq('id', bookingId).single();
-  if (!b) return null;
-
-  const driver = Array.isArray(b.driver) ? b.driver[0] : b.driver;
-  const vehicle = Array.isArray(b.vehicle) ? b.vehicle[0] : b.vehicle;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esuhai-booking-xe-v2.vercel.app';
-
-  // Token HMAC ký (bookingId + driverId + expiresEpoch=now+14d) — thay token
-  // raw driver_id cũ (vốn không bí mật, không expire, dùng chung mọi booking).
-  // /api/driver-response verify HMAC trước, fallback driver_id cũ trong 14 ngày.
-  const driverToken = b.driver_id ? signDriverToken(b.id, b.driver_id) : '';
-
-  return {
-    bookingId: b.id,
-    purpose: b.purpose,
-    category: b.category,
-    tripDate: b.trip_date,
-    pickupTime: b.pickup_time,
-    endTime: b.end_time,
-    itinerary: b.itinerary,
-    passengerCount: b.passenger_count,
-    requesterName: b.requester_name,
-    requesterDepartment: b.requester_department,
-    requesterEmail: b.requester_email,
-    staffInCharge: b.staff_in_charge,
-    flightNumber: b.flight_number,
-    memberNames: b.member_names,
-    driverName: driver?.full_name,
-    driverPhone: driver?.phone,
-    driverEmail: driver?.email,
-    vehicleType: vehicle?.vehicle_type,
-    plateNumber: vehicle?.plate_number,
-    rejectionReason: b.rejection_reason,
-    driverRejectionReason: b.driver_rejection_reason,
-    dashboardUrl: `${appUrl}/dashboard`,
-    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}&token=${driverToken}`,
-    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}&token=${driverToken}`,
-  };
-}
-
-// Helper: lấy config email
-async function getEmailConfig(supabase: ReturnType<typeof createAdminClient>) {
-  const { data } = await supabase.from('system_config').select('key, value')
-    .in('key', ['manager_email', 'always_cc']);
-  const config: Record<string, string> = {};
-  data?.forEach(c => { config[c.key] = c.value; });
-  return config;
-}
-
-// Helper: log email
-async function logEmail(supabase: ReturnType<typeof createAdminClient>, bookingId: string, templateName: string, to: string, subject: string, success: boolean, error?: string) {
-  await supabase.from('email_logs').insert({
-    booking_id: bookingId, template_name: templateName,
-    recipient_email: to, subject,
-    status: success ? 'sent' : 'failed',
-    error_message: error || null,
-  });
-}
-
-// Helper: thu thập TOÀN BỘ thành viên tham gia quy trình
-function collectRecipients(
-  emailData: Awaited<ReturnType<typeof getBookingEmailData>>,
-  config: Record<string, string>
-): { email: string; name: string }[] {
-  if (!emailData) return [];
-  const recipients: { email: string; name: string }[] = [];
-  const seen = new Set<string>();
-
-  function add(email: string | undefined | null, name: string) {
-    if (!email || seen.has(email)) return;
-    seen.add(email);
-    recipients.push({ email, name });
-  }
-
-  // Người đăng ký
-  add(emailData.requesterEmail, `anh/chị ${emailData.requesterName}`);
-  // Tài xế (nếu đã phân công)
-  add(emailData.driverEmail, `anh ${emailData.driverName}`);
-  // Quản lý
-  add(config.manager_email, 'chị');
-
-  return recipients;
-}
 
 // --- Approve Booking (handles multi-level) ---
 export async function approveBooking(bookingId: string) {
@@ -145,17 +70,25 @@ export async function approveBooking(bookingId: string) {
 
   if (updateErr) return { error: updateErr.message };
 
-  // Khi booking đạt trạng thái "đã duyệt" cuối cùng → gửi email cho quản lý để phân bổ tài xế
+  const config = await getEmailConfig(supabase);
+
   if (updateData.status === 'da_duyet') {
+    // Đã duyệt cấp cuối → gửi email cho Quản lý để phân bổ tài xế
     const emailData = await getBookingEmailData(supabase, bookingId);
-    if (emailData) {
-      const config = await getEmailConfig(supabase);
-      if (config.manager_email) {
-        const tpl = buildNewBookingEmail(emailData);
-        const result = await sendEmail({ to: config.manager_email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
-        await logEmail(supabase, bookingId, 'approved_notify_manager', config.manager_email, tpl.subject, result.success, result.error);
-      }
+    if (emailData && config.manager_email) {
+      const managerInfo = await lookupStaffByEmail(config.manager_email);
+      const tpl = buildNewBookingEmail({
+        ...emailData,
+        managerName: managerInfo?.name || config.manager_name || '',
+        managerGender: managerInfo?.gender || undefined,
+      });
+      const result = await sendEmail({ to: config.manager_email, cc: config.always_cc, subject: tpl.subject, html: tpl.html });
+      await logEmail(supabase, bookingId, 'approved_notify_manager', config.manager_email, tpl.subject, result.success, result.error);
     }
+  } else {
+    // Còn cấp duyệt phía sau → gửi email "Chờ duyệt cấp N" cho approver tương ứng
+    const nextLevel = (updateData.current_approval_level as number) as 1 | 2 | 3;
+    await notifyApprover(supabase, bookingId, nextLevel, maxLevels, config);
   }
 
   return { success: true, newStatus: updateData.status };

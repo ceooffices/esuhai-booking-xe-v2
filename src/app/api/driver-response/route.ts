@@ -8,90 +8,13 @@ import {
   buildDriverRejectEmail,
 } from '@/lib/email-templates';
 import { verifyDriverToken } from '@/lib/tokens';
+import { lookupStaffByEmail, lookupStaffByName } from '@/lib/staff';
+import { getBookingEmailData, getEmailConfig, logEmail } from '@/lib/booking-emails';
 
 // Backward-compat window cho token cũ (driver_id raw UUID).
 // Sau ngày này sẽ chỉ chấp nhận token HMAC mới — remove block legacy bên dưới.
 // Set = ngày deploy P0 + 14 ngày.
 const LEGACY_TOKEN_DEADLINE = new Date('2026-05-13T00:00:00Z');
-
-// Helper: lấy booking data cho email
-async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient>, bookingId: string) {
-  const { data: b } = await supabase.from('bookings').select(`
-    *, driver:drivers(full_name, phone, email), vehicle:vehicles(plate_number, vehicle_type)
-  `).eq('id', bookingId).single();
-  if (!b) return null;
-
-  const driver = Array.isArray(b.driver) ? b.driver[0] : b.driver;
-  const vehicle = Array.isArray(b.vehicle) ? b.vehicle[0] : b.vehicle;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esuhai-booking-xe-v2.vercel.app';
-
-  return {
-    bookingId: b.id,
-    purpose: b.purpose,
-    category: b.category,
-    tripDate: b.trip_date,
-    pickupTime: b.pickup_time,
-    endTime: b.end_time,
-    itinerary: b.itinerary,
-    passengerCount: b.passenger_count,
-    requesterName: b.requester_name,
-    requesterDepartment: b.requester_department,
-    requesterEmail: b.requester_email,
-    staffInCharge: b.staff_in_charge,
-    flightNumber: b.flight_number,
-    memberNames: b.member_names,
-    driverName: driver?.full_name,
-    driverPhone: driver?.phone,
-    driverEmail: driver?.email,
-    vehicleType: vehicle?.vehicle_type,
-    plateNumber: vehicle?.plate_number,
-    rejectionReason: b.rejection_reason,
-    driverRejectionReason: b.driver_rejection_reason,
-    dashboardUrl: `${appUrl}/dashboard`,
-    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}`,
-    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}`,
-  };
-}
-
-// Helper: lấy email config
-async function getEmailConfig(supabase: ReturnType<typeof createAdminClient>) {
-  const { data } = await supabase.from('system_config').select('key, value')
-    .in('key', ['manager_email', 'manager_name', 'always_cc']);
-  const config: Record<string, string> = {};
-  data?.forEach(c => { config[c.key] = c.value; });
-  return config;
-}
-
-// Helper: lookup staff by email/name → trả về name, gender, is_manager
-type StaffInfo = { name: string; email: string | null; gender: 'male' | 'female' | null; is_manager: boolean };
-
-async function lookupStaffByEmail(supabase: ReturnType<typeof createAdminClient>, email: string | null | undefined): Promise<StaffInfo | null> {
-  if (!email) return null;
-  const { data } = await supabase.from('staff')
-    .select('name, email, gender, is_manager')
-    .eq('email', email)
-    .maybeSingle();
-  return (data as StaffInfo | null) || null;
-}
-
-async function lookupStaffByName(supabase: ReturnType<typeof createAdminClient>, name: string | null | undefined): Promise<StaffInfo | null> {
-  if (!name) return null;
-  const { data } = await supabase.from('staff')
-    .select('name, email, gender, is_manager')
-    .eq('name', name)
-    .maybeSingle();
-  return (data as StaffInfo | null) || null;
-}
-
-// Helper: log email
-async function logEmail(supabase: ReturnType<typeof createAdminClient>, bookingId: string, templateName: string, to: string, subject: string, success: boolean, error?: string) {
-  await supabase.from('email_logs').insert({
-    booking_id: bookingId, template_name: templateName,
-    recipient_email: to, subject,
-    status: success ? 'sent' : 'failed',
-    error_message: error || null,
-  });
-}
 
 export async function POST(request: Request) {
   try {
@@ -174,7 +97,7 @@ export async function POST(request: Request) {
         }
 
         // 1. QUẢN LÝ — luôn nhận thông báo "Hoàn tất" (fix bug chị Hà)
-        const managerInfo = await lookupStaffByEmail(supabase, config.manager_email);
+        const managerInfo = await lookupStaffByEmail(config.manager_email);
         await sendOnce(config.manager_email, 'confirm_manager', () => buildConfirmManagerEmail({
           ...emailData,
           managerName: managerInfo?.name || config.manager_name || '',
@@ -182,14 +105,14 @@ export async function POST(request: Request) {
         }));
 
         // 2. NGƯỜI ĐĂNG KÝ — chỉ gửi khi khác manager
-        const requesterInfo = await lookupStaffByEmail(supabase, emailData.requesterEmail);
+        const requesterInfo = await lookupStaffByEmail(emailData.requesterEmail);
         await sendOnce(emailData.requesterEmail, 'confirm_booker', () => buildConfirmBookerEmail({
           ...emailData,
           requesterGender: requesterInfo?.gender || undefined,
         }));
 
         // 3. NV PHỤ TRÁCH — lookup theo tên trong staff table
-        const staffInfo = await lookupStaffByName(supabase, emailData.staffInCharge);
+        const staffInfo = await lookupStaffByName(emailData.staffInCharge);
         await sendOnce(staffInfo?.email, 'confirm_staff', () => buildConfirmStaffEmail({
           ...emailData,
           staffInChargeGender: staffInfo?.gender || undefined,
