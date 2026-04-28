@@ -96,7 +96,13 @@ export function pronoun(gender?: 'male' | 'female'): string {
 // SHARED CONSTANTS — Perfect 10 palette
 // ============================================================
 
-const F = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif";
+// Font stack ưu tiên Tahoma vì:
+// - Tahoma có sẵn trên 99% Windows/Mac, render tiếng Việt CÓ DẤU rất ổn
+//   (đặc biệt dấu mũ â/ê/ô và dấu hỏi/ngã không bị thiếu glyph hay clipped).
+// - Inter chỉ load được khi client cho phép web font (Gmail/Outlook chặn) →
+//   trước đây fallback về Calibri/Times → diacritics bị xấu.
+// - Segoe UI là fallback tốt cho Windows mới; Roboto cho Android Gmail.
+const F = "Tahoma, 'Segoe UI', Roboto, Arial, sans-serif";
 const BLUE = '#2563eb';
 const GREEN = '#16a34a';
 const RED = '#dc2626';
@@ -148,15 +154,21 @@ ${content}
 // ============================================================
 
 function headerBlock(title: string, subtitle: string, accentColor: string = BLUE): string {
+  // KHÔNG uppercase title: tiếng Việt có dấu mũ + dấu hỏi/ngã khi chuyển
+  // uppercase sẽ chồng dấu, line-height bị clip, mobile dễ rớt dòng giữa
+  // từ. Tăng line-height + mso-line-height-rule:exactly chống Outlook
+  // compress dòng làm clip dấu. Padding ngang 24px (thay vì 40px như các
+  // row khác) cho title dài có thêm bề ngang trên mobile — header center
+  // align nên không misalign với các row 40px bên dưới.
   return `
 <tr><td>
 <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
 <tr><td height="5" bgcolor="${accentColor}" style="background-color:${accentColor};font-size:0;line-height:0;">&nbsp;</td></tr>
 </table>
 </td></tr>
-<tr><td bgcolor="#ffffff" align="center" style="background-color:#ffffff;padding:36px 40px 16px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
-<h1 style="margin:0 0 6px;color:#0f172a;font-size:19px;font-family:${F};font-weight:800;letter-spacing:0.5px;text-transform:uppercase;">${title}</h1>
-<p style="margin:0;color:#64748b;font-size:13px;font-family:${F};font-weight:500;letter-spacing:0.8px;text-transform:uppercase;">${subtitle}</p>
+<tr><td bgcolor="#ffffff" align="center" style="background-color:#ffffff;padding:32px 24px 14px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+<h1 style="margin:0 0 6px;color:#0f172a;font-size:18px;font-family:${F};font-weight:700;line-height:1.4;mso-line-height-rule:exactly;word-wrap:break-word;overflow-wrap:break-word;">${title}</h1>
+<p style="margin:0;color:#64748b;font-size:12px;font-family:${F};font-weight:500;line-height:1.4;mso-line-height-rule:exactly;">${subtitle}</p>
 </td></tr>`;
 }
 
