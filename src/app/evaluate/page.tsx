@@ -11,6 +11,7 @@ function EvaluateContent() {
   const bookingId = params.get('id');
   const evaluatorName = params.get('name') || '';
   const evaluatorEmail = params.get('email') || '';
+  const token = params.get('token') || '';
 
   const [scores, setScores] = useState<Record<string, number>>({
     service_attitude: 0, traffic_compliance: 0,
@@ -34,6 +35,7 @@ function EvaluateContent() {
       evaluator_name: evaluatorName,
       ...scores as { service_attitude: number; traffic_compliance: number; vehicle_quality: number; safe_driving: number },
       feedback,
+      token,
     });
     if (result.error) {
       setStatus('error');
@@ -43,12 +45,13 @@ function EvaluateContent() {
     }
   }
 
-  if (!bookingId) {
+  // Bắt buộc cả 3: id, email người đánh giá, token (HMAC ký bookingId+email)
+  if (!bookingId || !evaluatorEmail || !token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-5">
         <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm text-center">
           <h2 className="text-xl font-bold text-slate-900">Đường dẫn không hợp lệ</h2>
-          <p className="text-base text-slate-500 mt-2">Vui lòng sử dụng đường dẫn từ email.</p>
+          <p className="text-base text-slate-500 mt-2">Vui lòng sử dụng đường dẫn từ email gốc.</p>
         </div>
       </div>
     );

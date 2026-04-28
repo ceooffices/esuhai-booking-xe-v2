@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email';
 import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail, buildNewBookingEmail } from '@/lib/email-templates';
+import { verifyEvalToken } from '@/lib/tokens';
 import type { BookingStatus } from '@/types/database';
 
 async function requireAuthUserEmail() {
@@ -407,12 +408,27 @@ export async function savePostTripCost(postTripId: string, bookingId: string, da
 }
 
 // --- Submit Evaluation ---
+// /evaluate là route public (xem middleware.ts) → KHÔNG check session.
+// Thay vào đó yêu cầu HMAC token ký bằng WEBHOOK_SECRET, ràng buộc với
+// (bookingId, evaluator_email). Token được sinh bằng signEvalToken()
+// và nhúng vào URL email mời đánh giá.
 export async function submitEvaluation(bookingId: string, data: {
   evaluator_email: string; evaluator_name: string;
   service_attitude: number; traffic_compliance: number;
   vehicle_quality: number; safe_driving: number;
   feedback: string;
+  token: string;
 }) {
+  if (!data.token || !verifyEvalToken(data.token, bookingId, data.evaluator_email)) {
+    return { error: 'Đường dẫn đánh giá không hợp lệ hoặc đã hết hiệu lực' };
+  }
+  // Kiểm tra điểm trong khoảng 1-5 (defense in depth — DB cũng có CHECK)
+  for (const k of ['service_attitude', 'traffic_compliance', 'vehicle_quality', 'safe_driving'] as const) {
+    const v = data[k];
+    if (!Number.isInteger(v) || v < 1 || v > 5) {
+      return { error: 'Điểm đánh giá phải là số nguyên từ 1 đến 5' };
+    }
+  }
   const supabase = createAdminClient();
   const { error } = await supabase.from('trip_evaluations').insert({
     booking_id: bookingId,
@@ -421,7 +437,13 @@ export async function submitEvaluation(bookingId: string, data: {
     vehicle_quality: data.vehicle_quality, safe_driving: data.safe_driving,
     feedback: data.feedback || null,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // 23505 = unique violation (booking_id, evaluator_email) — đã đánh giá rồi
+    if ((error as { code?: string }).code === '23505') {
+      return { error: 'Bạn đã đánh giá chuyến đi này rồi' };
+    }
+    return { error: 'Không lưu được đánh giá. Vui lòng thử lại.' };
+  }
   return { success: true };
 }
 
