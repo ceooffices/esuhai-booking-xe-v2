@@ -228,7 +228,7 @@ export async function rejectBooking(bookingId: string, reason: string) {
   const emailData = await getBookingEmailData(supabase, bookingId);
   if (emailData) {
     const config = await getEmailConfig(supabase);
-    const recipients = collectRecipients(emailData, config);
+    const recipients = await collectRecipients(emailData, config);
 
     for (const r of recipients) {
       const tpl = buildRejectAllEmail({ ...emailData, rejectionReason: reason, recipientName: r.name });
@@ -332,7 +332,7 @@ export async function cancelBooking(bookingId: string, reason: string) {
   // Gửi email huỷ chuyến cho TOÀN BỘ thành viên
   if (emailData) {
     const config = await getEmailConfig(supabase);
-    const recipients = collectRecipients(emailData, config);
+    const recipients = await collectRecipients(emailData, config);
 
     for (const r of recipients) {
       const tpl = buildCancellationEmail({

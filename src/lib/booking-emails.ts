@@ -141,23 +141,48 @@ export async function notifyApprover(
 }
 
 // Thu thập danh sách email cần thông báo khi huỷ chuyến / không duyệt:
-// requester + driver + manager. Dedupe theo email.
-export function collectRecipients(
+// requester + driver + manager + NV phụ trách. Dedupe theo email
+// (cùng template content cho tất cả nên dedupe đúng — không như confirm
+// flow vốn có 3 template khác content).
+//
+// LƯU Ý: async vì cần lookup staff_in_charge email theo tên từ staff
+// table (Google Form chỉ ghi tên text).
+export async function collectRecipients(
   emailData: BookingEmailContext | null,
   config: Record<string, string>
-): { email: string; name: string }[] {
+): Promise<{ email: string; name: string }[]> {
   if (!emailData) return [];
   const recipients: { email: string; name: string }[] = [];
   const seen = new Set<string>();
 
   function add(email: string | undefined | null, name: string) {
-    if (!email || seen.has(email)) return;
-    seen.add(email);
+    if (!email) return;
+    const lc = email.toLowerCase();
+    if (seen.has(lc)) return;
+    seen.add(lc);
     recipients.push({ email, name });
   }
 
+  // 1. Người đăng ký (đã hydrate trong getBookingEmailData nếu DB null)
   add(emailData.requesterEmail, `anh/chị ${emailData.requesterName}`);
+
+  // 2. Tài xế (nếu đã phân công)
   add(emailData.driverEmail, `anh ${emailData.driverName}`);
+
+  // 3. NV phụ trách (lookup theo tên trong staff table — quan trọng cho
+  //    chuyến đón sân bay: NV phụ trách cần biết để không ra sân bay
+  //    đón vô ích khi chuyến đã huỷ).
+  if (emailData.staffInCharge) {
+    const staff = await lookupStaffByName(emailData.staffInCharge);
+    if (staff?.email) {
+      const greeting = staff.gender === 'female' ? 'chị' : staff.gender === 'male' ? 'anh' : 'anh/chị';
+      add(staff.email, `${greeting} ${emailData.staffInCharge}`);
+    } else {
+      console.warn(`[booking-emails] collectRecipients: không tìm được email cho NV phụ trách "${emailData.staffInCharge}" — bỏ qua thông báo cho NV này.`);
+    }
+  }
+
+  // 4. Quản lý
   add(config.manager_email, 'chị');
 
   return recipients;
