@@ -68,15 +68,26 @@ export async function POST(request: Request) {
     }
 
     if (action === 'confirm') {
-      const { error } = await supabase
+      // Atomic guard: chỉ confirm khi status vẫn là cho_tx_xac_nhan.
+      // Nếu tài xế double-click hoặc race với reject, chỉ thao tác đầu
+      // tiên thắng — thao tác sau no-op (không ghi đè timestamp).
+      const { data: updated, error } = await supabase
         .from('bookings')
         .update({
           status: 'tx_da_nhan',
           driver_confirmed_at: new Date().toISOString(),
         })
-        .eq('id', booking_id);
+        .eq('id', booking_id)
+        .eq('status', 'cho_tx_xac_nhan')
+        .select('id')
+        .maybeSingle();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (!updated) {
+        // Race lost — booking đã chuyển trạng thái khác. Trả 200 để
+        // tài xế thấy "đã xử lý" thay vì lỗi.
+        return NextResponse.json({ success: true, message: 'Already processed' });
+      }
 
       // Gửi email xác nhận sau khi tài xế nhận ca:
       //   1. QUẢN LÝ        → buildConfirmManagerEmail  ("Hoàn tất")
@@ -127,15 +138,22 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Reason required' }, { status: 400 });
       }
 
-      const { error } = await supabase
+      // Atomic guard: tương tự confirm, chỉ reject khi vẫn cho_tx_xac_nhan.
+      const { data: updated, error } = await supabase
         .from('bookings')
         .update({
           status: 'tx_tu_choi',
           driver_rejection_reason: reason,
         })
-        .eq('id', booking_id);
+        .eq('id', booking_id)
+        .eq('status', 'cho_tx_xac_nhan')
+        .select('id')
+        .maybeSingle();
 
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (!updated) {
+        return NextResponse.json({ success: true, message: 'Already processed' });
+      }
 
       // Gửi email từ chối cho quản lý để phân bổ lại
       const emailData = await getBookingEmailData(supabase, booking_id);

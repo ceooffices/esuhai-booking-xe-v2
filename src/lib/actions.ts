@@ -65,10 +65,22 @@ export async function approveBooking(bookingId: string) {
     };
   }
 
-  const { error: updateErr } = await supabase
-    .from('bookings').update(updateData).eq('id', bookingId);
+  // Atomic guard: chỉ update khi status + current_approval_level VẪN
+  // còn ở giá trị mong đợi. Nếu 2 approver bấm Duyệt cùng lúc, người
+  // sau update 0 rows → biết có race và trả lỗi rõ ràng.
+  const { data: updated, error: updateErr } = await supabase
+    .from('bookings')
+    .update(updateData)
+    .eq('id', bookingId)
+    .eq('status', expectedStatus[level])
+    .eq('current_approval_level', level)
+    .select('id')
+    .maybeSingle();
 
   if (updateErr) return { error: updateErr.message };
+  if (!updated) {
+    return { error: 'Yêu cầu vừa được duyệt bởi người khác. Vui lòng tải lại trang.' };
+  }
 
   const config = await getEmailConfig(supabase);
 
@@ -107,13 +119,25 @@ export async function rejectBooking(bookingId: string, reason: string) {
   const supabase = createAdminClient();
   if (!reason.trim()) return { error: 'Vui lòng nhập lý do' };
 
-  const { error } = await supabase.from('bookings').update({
-    status: 'khong_duyet' as BookingStatus,
-    rejection_reason: reason,
-    rejected_by: rejectedBy,
-  }).eq('id', bookingId);
+  // Atomic guard: chỉ "không duyệt" khi booking đang trong giai đoạn duyệt.
+  // Sau khi đã da_duyet/cho_tx_xac_nhan/etc, dùng cancelBooking thay vì
+  // reject (tránh status data bị bóp méo).
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'khong_duyet' as BookingStatus,
+      rejection_reason: reason,
+      rejected_by: rejectedBy,
+    })
+    .eq('id', bookingId)
+    .in('status', ['cho_duyet', 'cho_duyet_cap2', 'cho_duyet_cap3'])
+    .select('id')
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) {
+    return { error: 'Yêu cầu không còn ở trạng thái chờ duyệt — không thể "không duyệt". Nếu cần huỷ, dùng chức năng Huỷ chuyến.' };
+  }
 
   // Gửi email thông báo không duyệt cho TOÀN BỘ thành viên
   const emailData = await getBookingEmailData(supabase, bookingId);
@@ -146,13 +170,25 @@ export async function assignDriverVehicle(bookingId: string, driverId: string, v
   if (!driver) return { error: 'Tài xế không tồn tại' };
   if (!driver.email) return { error: `Tài xế ${driver.full_name} chưa có email` };
 
-  const { error } = await supabase.from('bookings').update({
-    driver_id: driverId,
-    vehicle_id: vehicleId,
-    status: 'cho_tx_xac_nhan' as BookingStatus,
-  }).eq('id', bookingId);
+  // Atomic guard: chỉ phân công khi status đang ở 'da_duyet' (vừa duyệt
+  // xong) hoặc 'tx_tu_choi' (tài xế trước từ chối, cần phân bổ lại).
+  // Tránh 2 người cùng phân công 2 tài xế khác nhau cho 1 booking.
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({
+      driver_id: driverId,
+      vehicle_id: vehicleId,
+      status: 'cho_tx_xac_nhan' as BookingStatus,
+    })
+    .eq('id', bookingId)
+    .in('status', ['da_duyet', 'tx_tu_choi'])
+    .select('id')
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) {
+    return { error: 'Yêu cầu không ở trạng thái có thể phân công. Có thể đã được phân công bởi người khác. Tải lại trang để xem trạng thái mới nhất.' };
+  }
 
   // Gửi email phân công cho tài xế
   const emailData = await getBookingEmailData(supabase, bookingId);
@@ -188,13 +224,25 @@ export async function cancelBooking(bookingId: string, reason: string) {
   // Lấy data trước khi update (cần driver/vehicle info)
   const emailData = await getBookingEmailData(supabase, bookingId);
 
-  const { error } = await supabase.from('bookings').update({
-    status: 'da_huy' as BookingStatus,
-    cancelled_by: cancelledBy,
-    cancellation_reason: reason,
-  }).eq('id', bookingId);
+  // Atomic guard: chỉ huỷ booking chưa kết thúc. Chặn huỷ booking đã
+  // hoàn thành (lịch sử) hoặc đã huỷ (huỷ 2 lần → spam email cho mọi
+  // người 2 lần).
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({
+      status: 'da_huy' as BookingStatus,
+      cancelled_by: cancelledBy,
+      cancellation_reason: reason,
+    })
+    .eq('id', bookingId)
+    .not('status', 'in', '(da_huy,da_hoan_thanh)')
+    .select('id')
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) {
+    return { error: 'Yêu cầu đã hoàn thành hoặc đã huỷ trước đó — không thể huỷ lại.' };
+  }
 
   // Gửi email huỷ chuyến cho TOÀN BỘ thành viên
   if (emailData) {
@@ -225,11 +273,21 @@ export async function completeTrip(bookingId: string) {
   }
   const supabase = createAdminClient();
 
-  const { error } = await supabase.from('bookings').update({
-    status: 'da_hoan_thanh' as BookingStatus,
-  }).eq('id', bookingId);
+  // Atomic guard: chỉ complete khi booking đang ở trạng thái có thể
+  // thực hiện chuyến (tài xế đã nhận / sẵn sàng). Tránh complete sớm
+  // khi chưa duyệt hoặc complete lại lần 2.
+  const { data: updated, error } = await supabase
+    .from('bookings')
+    .update({ status: 'da_hoan_thanh' as BookingStatus })
+    .eq('id', bookingId)
+    .in('status', ['tx_da_nhan', 'san_sang'])
+    .select('id')
+    .maybeSingle();
 
   if (error) return { error: error.message };
+  if (!updated) {
+    return { error: 'Yêu cầu chưa sẵn sàng để hoàn thành (cần tài xế xác nhận trước) hoặc đã hoàn thành rồi.' };
+  }
   return { success: true };
 }
 
