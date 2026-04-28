@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { X, Search, User } from 'lucide-react';
+import { createBookingFromDashboard } from '@/lib/actions';
 
 interface StaffMember {
   name: string;
@@ -100,20 +101,17 @@ export function CreateBookingModal({ onClose, onCreated, staffList }: Props) {
     setLoading(true);
     setError('');
 
+    // Server action có session auth + role check, KHÔNG cần webhook secret
+    // (trước đây POST /api/webhooks/google-form bị 401 sau fix fail-closed).
     try {
-      const res = await fetch('/api/webhooks/google-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, source: 'dashboard' }),
-      });
-      const data = await res.json();
-      if (data.success) {
+      const result = await createBookingFromDashboard(form);
+      if (result.success) {
         onCreated();
       } else {
-        setError(data.error || 'Có lỗi xảy ra');
+        setError(result.error || 'Có lỗi xảy ra');
       }
-    } catch {
-      setError('Không kết nối được server');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không kết nối được server');
     }
     setLoading(false);
   }

@@ -20,6 +20,91 @@ import {
 } from '@/lib/booking-emails';
 import type { BookingStatus } from '@/types/database';
 
+// --- Create Booking từ Dashboard "Tạo yêu cầu" modal ---
+// LƯU Ý: chỉ cho Quản lý dùng (regular staff đăng ký qua Google Form,
+// không qua dashboard). Dashboard hiện ở vai trò ban điều hành.
+//
+// Tại sao server action mà KHÔNG POST /api/webhooks/google-form?
+// → Webhook phải kiểm WEBHOOK_SECRET (fail-closed). Client browser
+//   không thể gửi secret an toàn (lộ secret). Server action có session
+//   auth qua cookies → an toàn + đủ context check role.
+export async function createBookingFromDashboard(data: {
+  requester_name: string;
+  requester_department: string;
+  requester_email: string;
+  category: string;
+  purpose: string;
+  trip_date: string;
+  pickup_time: string;
+  end_time: string;
+  itinerary: string;
+  passenger_count: number;
+  staff_in_charge: string;
+  flight_number: string;
+  member_names: string;
+  is_external_vehicle: boolean;
+}): Promise<{ success?: boolean; bookingId?: string; error?: string }> {
+  // 1. Auth + role check
+  let creatorEmail: string;
+  try {
+    const role = await requireManagerRole();
+    creatorEmail = role.email;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : 'Không có quyền' };
+  }
+
+  // 2. Validate required fields (defense in depth — UI cũng required)
+  if (!data.requester_name?.trim()) return { error: 'Vui lòng nhập tên người đăng ký' };
+  if (!data.purpose?.trim()) return { error: 'Vui lòng nhập mục đích' };
+  if (!data.trip_date) return { error: 'Vui lòng chọn ngày đi' };
+  if (!data.pickup_time) return { error: 'Vui lòng chọn giờ đón' };
+  if (data.passenger_count !== undefined && (!Number.isInteger(data.passenger_count) || data.passenger_count < 1)) {
+    return { error: 'Số lượng người phải là số nguyên ≥ 1' };
+  }
+
+  // 3. Insert booking
+  const supabase = createAdminClient();
+  const isExternal = data.is_external_vehicle === true;
+
+  const { data: inserted, error } = await supabase.from('bookings').insert({
+    requester_name: data.requester_name.trim(),
+    requester_department: data.requester_department || '',
+    requester_email: data.requester_email?.trim() || null,
+    category: data.category || 'Nội bộ',
+    purpose: data.purpose.trim(),
+    trip_date: data.trip_date,
+    pickup_time: data.pickup_time,
+    end_time: data.end_time || null,
+    itinerary: data.itinerary?.trim() || null,
+    passenger_count: data.passenger_count || 1,
+    staff_in_charge: data.staff_in_charge?.trim() || null,
+    flight_number: data.flight_number?.trim() || null,
+    member_names: data.member_names?.trim() || null,
+    is_external_vehicle: isExternal,
+    is_designated_vehicle: false,
+    status: 'cho_duyet' as BookingStatus,
+    max_approval_levels: isExternal ? 3 : 1,
+    current_approval_level: 1,
+    notes: `Tạo từ dashboard bởi ${creatorEmail}`,
+  }).select('id').single();
+
+  if (error || !inserted) {
+    console.error('[createBookingFromDashboard] insert error:', error);
+    return { error: 'Không tạo được yêu cầu. Vui lòng thử lại.' };
+  }
+
+  // 4. Notify approver L1 (best-effort, không block response)
+  try {
+    const config = await getEmailConfig(supabase);
+    const totalLevels = isExternal ? 3 : 1;
+    await notifyApprover(supabase, inserted.id, 1, totalLevels, config);
+  } catch (e) {
+    console.error('[createBookingFromDashboard] notifyApprover error:', e);
+  }
+
+  return { success: true, bookingId: inserted.id };
+}
+
 // --- Approve Booking (handles multi-level) ---
 export async function approveBooking(bookingId: string) {
   let approverEmail: string;
