@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email';
 import { buildDriverAssignEmail, buildCancellationEmail, buildRejectAllEmail, buildNewBookingEmail } from '@/lib/email-templates';
-import { verifyEvalToken } from '@/lib/tokens';
+import { signDriverToken, verifyEvalToken } from '@/lib/tokens';
 import type { BookingStatus } from '@/types/database';
 
 async function requireAuthUserEmail() {
@@ -24,6 +24,11 @@ async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient
   const driver = Array.isArray(b.driver) ? b.driver[0] : b.driver;
   const vehicle = Array.isArray(b.vehicle) ? b.vehicle[0] : b.vehicle;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esuhai-booking-xe-v2.vercel.app';
+
+  // Token HMAC ký (bookingId + driverId + expiresEpoch=now+14d) — thay token
+  // raw driver_id cũ (vốn không bí mật, không expire, dùng chung mọi booking).
+  // /api/driver-response verify HMAC trước, fallback driver_id cũ trong 14 ngày.
+  const driverToken = b.driver_id ? signDriverToken(b.id, b.driver_id) : '';
 
   return {
     bookingId: b.id,
@@ -48,8 +53,8 @@ async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient
     rejectionReason: b.rejection_reason,
     driverRejectionReason: b.driver_rejection_reason,
     dashboardUrl: `${appUrl}/dashboard`,
-    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}&token=${b.driver_id}`,
-    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}&token=${b.driver_id}`,
+    confirmUrl: `${appUrl}/driver-response?action=confirm&id=${b.id}&token=${driverToken}`,
+    rejectUrl: `${appUrl}/driver-response?action=reject&id=${b.id}&token=${driverToken}`,
   };
 }
 

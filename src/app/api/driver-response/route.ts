@@ -7,6 +7,12 @@ import {
   buildConfirmManagerEmail,
   buildDriverRejectEmail,
 } from '@/lib/email-templates';
+import { verifyDriverToken } from '@/lib/tokens';
+
+// Backward-compat window cho token cũ (driver_id raw UUID).
+// Sau ngày này sẽ chỉ chấp nhận token HMAC mới — remove block legacy bên dưới.
+// Set = ngày deploy P0 + 14 ngày.
+const LEGACY_TOKEN_DEADLINE = new Date('2026-05-13T00:00:00Z');
 
 // Helper: lấy booking data cho email
 async function getBookingEmailData(supabase: ReturnType<typeof createAdminClient>, bookingId: string) {
@@ -108,11 +114,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
     }
 
-    // --- Security: Verify token matches the driver assigned to this booking ---
-    // Token = driver_id (included in the email link). Only the assigned driver knows their own link.
-    // This prevents random users from confirming/rejecting on behalf of the driver.
-    if (!token || token !== booking.driver_id) {
-      return NextResponse.json({ error: 'Invalid or missing verification token' }, { status: 403 });
+    // --- Security: Verify driver token ---
+    // Format mới (P0 fix 2026-04-28): HMAC ký bookingId+driverId+expiresEpoch
+    // (TTL 14 ngày). Format cũ: raw driver_id UUID — vẫn accept tới
+    // LEGACY_TOKEN_DEADLINE để email phân công đã gửi không bị gián đoạn.
+    if (!token || !booking.driver_id) {
+      return NextResponse.json({ error: 'Token xác minh không hợp lệ' }, { status: 403 });
+    }
+    const tokenCheck = verifyDriverToken(token, booking.id, booking.driver_id);
+    if (tokenCheck.valid && tokenCheck.expired) {
+      return NextResponse.json({
+        error: 'Đường dẫn đã hết hiệu lực sau 14 ngày. Vui lòng liên hệ Phòng Tổng Hợp để được phân công lại.',
+      }, { status: 403 });
+    }
+    if (!tokenCheck.valid) {
+      // Fallback: token cũ = raw driver_id (chỉ tới deadline)
+      const isLegacy = token === booking.driver_id;
+      const stillInWindow = new Date() < LEGACY_TOKEN_DEADLINE;
+      if (!isLegacy || !stillInWindow) {
+        return NextResponse.json({ error: 'Token xác minh không hợp lệ' }, { status: 403 });
+      }
+      console.warn(`[driver-response] LEGACY token cho booking ${booking.id}. Hard cutover sau ${LEGACY_TOKEN_DEADLINE.toISOString()}.`);
     }
 
     if (booking.status !== 'cho_tx_xac_nhan') {
