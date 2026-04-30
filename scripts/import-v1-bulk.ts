@@ -385,16 +385,24 @@ async function processRow(row: string[], rowIdx: number): Promise<RowResult> {
 
   // Map status
   const status = mapStatus(row);
-  const isExternal = isTruthy(row[COL.EXTERNAL_VEHICLE]);
+
+  // Auto-detect external từ NHIỀU signal (V1 sheet không nhất quán):
+  //   1. Cột 23 "Xe ngoài" có giá trị truthy
+  //   2. Cột 16 "Xe" bắt đầu bằng "Xe ngoai" / "Xe ngoài"
+  //   3. Cột 24 "Nhà cung cấp" có giá trị (supplier = chắc chắn xe ngoài)
+  const vehicleText = clean(row[COL.VEHICLE]);
+  const supplierRaw = clean(row[COL.SUPPLIER]);
+  let isExternal = isTruthy(row[COL.EXTERNAL_VEHICLE]);
+  if (!isExternal && vehicleText && /^xe\s*ngo[aà]i/i.test(vehicleText)) isExternal = true;
+  if (!isExternal && supplierRaw) isExternal = true;
 
   // Lookup driver/vehicle
   const driverName = clean(row[COL.DRIVER]);
-  const vehicleText = clean(row[COL.VEHICLE]);
   const driverId = driverName ? await lookupDriverIdByName(driverName) : null;
   const vehicleId = vehicleText && !isExternal ? await lookupVehicleIdByText(vehicleText) : null;
 
-  if (driverName && !driverId) warnings.push(`driver "${driverName}" không match → driver_id=null`);
-  if (vehicleText && !vehicleId && !isExternal) warnings.push(`vehicle "${vehicleText}" không match → vehicle_id=null`);
+  if (driverName && !driverId) warnings.push(`driver "${driverName}" không match → driver_id=null (cần thêm vào /drivers V2)`);
+  if (vehicleText && !vehicleId && !isExternal) warnings.push(`vehicle "${vehicleText}" không match → vehicle_id=null (cần thêm vào /vehicles V2)`);
 
   // Rejection reason (depends on status — driver reject vs manager reject)
   const rejReason = clean(row[COL.REJECTION_REASON]);
@@ -415,9 +423,24 @@ async function processRow(row: string[], rowIdx: number): Promise<RowResult> {
     }
   }
 
-  // External vehicle info: combine supplier + plate
-  const supplier = clean(row[COL.SUPPLIER]);
-  const externalPlate = clean(row[COL.EXTERNAL_PLATE]);
+  // External vehicle info: ưu tiên cột 24+25 (supplier + plate), fallback
+  // parse từ cột 16 nếu format "Xe ngoai - SUPPLIER (PLATE)" hoặc
+  // "Xe ngoai - SUPPLIER".
+  let supplier = supplierRaw;
+  let externalPlate = clean(row[COL.EXTERNAL_PLATE]);
+  if (isExternal && !supplier && !externalPlate && vehicleText) {
+    const m = vehicleText.match(/xe\s*ngo[aà]i\s*[-—–:]\s*(.+)/i);
+    if (m) {
+      const rest = m[1].trim();
+      const plateMatch = rest.match(/\(([^)]+)\)/);
+      if (plateMatch) {
+        externalPlate = plateMatch[1].trim();
+        supplier = rest.replace(/\s*\([^)]*\)\s*/, '').trim() || null;
+      } else {
+        supplier = rest;
+      }
+    }
+  }
   const external_vehicle_info = isExternal
     ? [supplier, externalPlate].filter(Boolean).join(' — ') || null
     : null;
