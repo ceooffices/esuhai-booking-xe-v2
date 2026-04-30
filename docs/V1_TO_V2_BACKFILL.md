@@ -134,13 +134,52 @@ SELECT count(*) FROM bookings WHERE notes LIKE '[v1 ts=%' AND driver_id IS NULL;
 
 ## Sau khi backfill
 
-### A. Disable V1 GAS email triggers
+### A. Disable V1 GAS email gửi (KHÔNG xoá trigger)
 
-Vào **Apps Script editor** của V1:
-1. Tìm các trigger `onEdit`, `onFormSubmit` mà gửi email
-2. Disable hoặc xoá → tránh trùng email V1 + V2
+V1 dùng pattern `email_router.gs` (transport layer) — mọi caller (`onFormSubmit`,
+`onSheetEdit`) đều gọi function `sendEmail(emailData)`. Cách an toàn nhất:
+**stub `sendEmail()` thành no-op**, không xoá triggers.
 
-⚠️ **Giữ lại trigger forward GForm → V2 webhook** (để booking mới vẫn vào V2).
+Vào **Apps Script editor → email_router.gs** → replace TOÀN BỘ function
+`sendEmail` bằng:
+
+```javascript
+function sendEmail(emailData) {
+  var firstEmail = (emailData.to || "").split(",")[0].trim();
+  if (!isValidEmail(firstEmail)) {
+    Logger.log("[email][V1-DISABLED] Invalid email, skip: " + emailData.to);
+    return false;
+  }
+  Logger.log("[email][V1-DISABLED] Đã chặn gửi: to=" + emailData.to + " subject=" + emailData.subject);
+  try {
+    logEmailSend(
+      "v1_disabled_" + (emailData.type || "unknown"),
+      "[V1 STOPPED 2026-04-30] " + (emailData.to || "") + " | " + (emailData.subject || "")
+    );
+  } catch (e) {
+    Logger.log("[email][V1-DISABLED] log error: " + e.message);
+  }
+  return true; // giả lập success để caller không error
+}
+```
+
+→ Save (KHÔNG cần Deploy lại — function hot-swap).
+
+**Verify:** sheet "Email Log" V1 sẽ có entries `[V1 STOPPED 2026-04-30]`
+mỗi khi V1 muốn gửi email — confirm V1 đã ngừng phát mail.
+
+⚠️ **GIỮ LẠI** (đừng xoá):
+- File `email_router.gs` (chỉ stub function `sendEmail`)
+- Trigger `onFormSubmit` forward GForm → V2 webhook (booking mới vẫn vào V2)
+- Function `logEmailSend` (vẫn cần để audit)
+- Function `sendViaWebhook` + `sendViaGmail` (backup, không gọi nếu sendEmail stub)
+
+(Tuỳ chọn) Defense in depth — vào **tab Config V1 sheet**:
+
+- Row `EMAIL_METHOD` → đổi value sang `disabled`
+- Row `sys_webhookUrl` → để trống
+
+→ Phòng trường hợp code khác bypass `sendEmail` mà gọi `sendViaWebhook` direct.
 
 ### B. Freeze V1 sheet
 
