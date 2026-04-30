@@ -3,7 +3,8 @@
 ## Tech Stack
 - **Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS
 - **Database**: Supabase (PostgreSQL) with Row Level Security
-- **Auth**: Supabase Auth (Magic Link email)
+- **Auth**: Supabase Auth — **Magic Link** (`signInWithOtp`, không password). Onboarding chi tiết: [docs/ONBOARDING.md](docs/ONBOARDING.md)
+- **Authorization**: `requireManagerRole()` — check `staff.is_manager=TRUE` HOẶC email trong env `ALLOWED_MANAGER_EMAILS` (whitelist Vercel)
 - **Email**: Nodemailer SMTP trực tiếp (Office365) — độc lập, không dùng n8n
 - **Deploy**: Vercel (free tier)
 - **Staff data**: Supabase (same instance, `staff` table from Ver01)
@@ -12,7 +13,7 @@
 ```
 src/
   app/
-    (auth)/login/            — Login page (magic link)
+    (auth)/login/            — Login page (Magic Link, signInWithOtp)
     (dashboard)/             — Protected dashboard layout
       dashboard/             — Main overview
       calendar/              — Calendar view (X=ngay, Y=xe)
@@ -35,7 +36,12 @@ src/
     content.ts               — All Vietnamese copy
   lib/
     supabase/                — Client, server, admin, middleware
-    email.ts                 — n8n email service
+    auth.ts                  — requireAuthUserEmail + requireManagerRole
+    staff.ts                 — Lookup staff theo email/tên (multi-tier)
+    tokens.ts                — HMAC sign/verify (driver-response, /evaluate)
+    booking-emails.ts        — getBookingEmailData, getEmailConfig, notifyApprover, collectRecipients
+    email.ts                 — Nodemailer SMTP wrapper
+    email-templates.ts       — 11 email templates (V2.2 + approval request)
   types/
     database.ts              — All TypeScript types
 supabase/
