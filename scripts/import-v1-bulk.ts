@@ -368,20 +368,27 @@ async function processRow(row: string[], rowIdx: number): Promise<RowResult> {
   if (!tripDate) return { rowIdx, status: 'skip', reason: `trip_date không parse được: "${row[COL.TRIP_DATE]}"` };
   if (!pickupTime) return { rowIdx, status: 'skip', reason: `pickup_time không parse được: "${row[COL.PICKUP_TIME]}"` };
 
-  // Idempotency key: V1 timestamp from col 1 (form submit moment, unique per booking)
+  // Idempotency tag (cho row mới import lần đầu — webhook đã insert thì
+  // không có tag này, sẽ match composite key bên dưới)
   const v1Timestamp = parseDateTime(row[COL.TIMESTAMP]) || row[COL.TIMESTAMP] || `row-${rowIdx}`;
   const idempotencyTag = `[v1 ts=${v1Timestamp} row=${rowIdx}]`;
 
-  // Check exists
-  const { data: existing } = await supabase
+  // Match V2 booking hiện tại theo composite key:
+  //   requester_name (case-insensitive) + trip_date + pickup_time
+  // Webhook trước đây insert với notes='v1_row:N' → match composite này
+  // sẽ tìm thấy → UPDATE thay vì INSERT (tránh duplicate).
+  const { data: matches } = await supabase
     .from('bookings')
-    .select('id')
-    .ilike('notes', `${idempotencyTag}%`)
-    .maybeSingle();
+    .select('id, status, driver_id, vehicle_id, notes, requester_email')
+    .eq('trip_date', tripDate)
+    .eq('pickup_time', pickupTime)
+    .ilike('requester_name', requesterName)
+    .limit(2);
 
-  if (existing) {
-    return { rowIdx, status: 'skip', reason: `đã import trước đó (booking ${existing.id})` };
+  if (matches && matches.length > 1) {
+    return { rowIdx, status: 'skip', reason: `match ${matches.length} booking V2 (ambiguous: ${requesterName} + ${tripDate} + ${pickupTime}) — bỏ qua an toàn` };
   }
+  const existing = matches?.[0] || null;
 
   // Map status
   const status = mapStatus(row);
@@ -498,24 +505,67 @@ async function processRow(row: string[], rowIdx: number): Promise<RowResult> {
       status: payload.status,
       driver_id: payload.driver_id,
       is_external: payload.is_external_vehicle,
+      mode: existing ? 'UPDATE' : 'INSERT',
     }, null, 2));
   }
 
   if (!apply) {
-    return { rowIdx, status: 'ok', reason: 'dry-run', warnings };
+    const mode = existing ? `update existing ${existing.id.slice(0, 8)}` : 'insert new';
+    return { rowIdx, status: 'ok', reason: `dry-run (${mode})`, warnings };
   }
 
+  if (existing) {
+    // UPDATE: sync stateful fields từ V1 sheet vào booking đã có
+    // KHÔNG đụng identifier fields (requester_name, trip_date, pickup_time,
+    // requester_email, created_at) và KHÔNG ghi đè driver_id/vehicle_id
+    // nếu V1 sheet không có (giữ nguyên giá trị V2 đã set qua dashboard).
+    const updatePayload = {
+      // Stateful — luôn sync từ V1
+      status: payload.status,
+      current_approval_level: payload.current_approval_level,
+      max_approval_levels: payload.max_approval_levels,
+      rejection_reason: payload.rejection_reason,
+      driver_rejection_reason: payload.driver_rejection_reason,
+      cancelled_by: payload.cancelled_by,
+      cancellation_reason: payload.cancellation_reason,
+      is_external_vehicle: payload.is_external_vehicle,
+      external_vehicle_info: payload.external_vehicle_info,
+      external_vehicle_cost: payload.external_vehicle_cost,
+      ops_notes: payload.ops_notes,
+      // Đồng bộ thêm: nếu V1 có đầy đủ thông tin chi tiết hơn webhook
+      itinerary: payload.itinerary,
+      end_time: payload.end_time,
+      passenger_count: payload.passenger_count,
+      staff_in_charge: payload.staff_in_charge,
+      flight_number: payload.flight_number,
+      member_names: payload.member_names,
+      // Driver/vehicle: chỉ set nếu V1 có VÀ V2 chưa có (không clear nếu null)
+      driver_id: payload.driver_id || existing.driver_id,
+      vehicle_id: payload.vehicle_id || existing.vehicle_id,
+      // Notes: append v1-sync tag (giữ nguyên webhook v1_row tag để truy nguồn)
+      notes: existing.notes ? `${existing.notes} ${idempotencyTag}` : idempotencyTag,
+    };
+
+    const { error } = await supabase
+      .from('bookings')
+      .update(updatePayload)
+      .eq('id', existing.id);
+
+    if (error) return { rowIdx, status: 'error', reason: `UPDATE: ${error.message}`, warnings };
+
+    return { rowIdx, status: 'ok', bookingId: existing.id, reason: 'UPDATE', warnings };
+  }
+
+  // INSERT mới (rare — chỉ khi CSV có row webhook chưa nhận)
   const { data: inserted, error } = await supabase
     .from('bookings')
     .insert(payload)
     .select('id')
     .single();
 
-  if (error) {
-    return { rowIdx, status: 'error', reason: error.message, warnings };
-  }
+  if (error) return { rowIdx, status: 'error', reason: `INSERT: ${error.message}`, warnings };
 
-  return { rowIdx, status: 'ok', bookingId: inserted.id, warnings };
+  return { rowIdx, status: 'ok', bookingId: inserted.id, reason: 'INSERT', warnings };
 }
 
 // ---------- Main ----------
