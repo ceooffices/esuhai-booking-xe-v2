@@ -97,6 +97,7 @@ export interface Driver {
   license_issued_place: string | null;
   vehicle_types_can_drive: string[];  // checklist
   is_available: boolean;
+  team_lead_email: string | null;     // 004 — gom team cho KPI cứng (Block C)
   created_at: string;
 }
 

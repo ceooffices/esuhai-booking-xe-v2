@@ -10,6 +10,7 @@ import {
   Users,
   Car,
   BarChart3,
+  Gauge,
   Settings,
   LogOut,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { href: '/drivers', label: 'Tài xế', icon: Users },
   { href: '/vehicles', label: 'Phương tiện', icon: Car },
   { href: '/reports', label: 'Báo cáo', icon: BarChart3 },
+  { href: '/kpi/driver-monthly', label: 'KPI cứng', icon: Gauge },
   { href: '/settings', label: 'Cấu hình', icon: Settings },
 ];
 
