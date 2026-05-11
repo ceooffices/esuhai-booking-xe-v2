@@ -11,6 +11,8 @@
 ```
 Bắt đầu Block [BLOCK_ID] — [BLOCK_NAME].
 
+ACTION: Đọc TOÀN BỘ file trong Context trước. Sau khi đọc xong, tóm tắt 3-5 câu về hiểu biết của em (file nào làm gì, pattern nào sẽ reuse). RỒI MỚI implement. KHÔNG code trước khi đọc.
+
 ## Context
 Đọc trước:
 - docs/ROADMAP.md §3 Tuần [N] Block [BLOCK_ID]
@@ -36,6 +38,8 @@ Push PR + viết Report theo .cursorrules §11. ĐỪNG merge. ĐỪNG sang Bloc
 ```
 Bắt đầu Block A — Sync doc & runbook.
 
+ACTION: Đọc TOÀN BỘ file trong Context trước. Sau khi đọc xong, tóm tắt 3-5 câu về hiểu biết của em (chỗ nào đang stale, cần sửa gì). RỒI MỚI viết. KHÔNG sửa doc trước khi đọc hết context.
+
 ## Context
 Đọc trước:
 - docs/ROADMAP.md §3 Tuần 1 Block A
@@ -51,8 +55,10 @@ Bắt đầu Block A — Sync doc & runbook.
 - [ ] A.3 Tạo docs/RUNBOOKS.md với 4 runbook: cấp password, reset password, gỡ quyền, restore data
 - [ ] A.4 Viết lại README.md (bỏ boilerplate Next.js)
 - [ ] A.5 Cập nhật BACKLOG.md — tick P0/P1 đã fix
-- [ ] A.6 git add docs/NHAT_TRINH_SWABB_PHAM_HONG_KHANH_TB_TAI_XE_V2.2.md
-- [ ] Verify: onboard 1 user test theo doc mới → vào được dashboard + bấm Duyệt được (write step trong Report)
+- A.6 SKIP — đã done trong commit `b3a021b` (file NHAT_TRINH đã tracked)
+
+## Verification (PM thực hiện sau, KHÔNG phải DEV)
+PM sẽ test thủ công: onboard 1 user mới theo đúng ONBOARDING.md → user login + bấm Duyệt 1 booking test thành công. **Yêu cầu cho DEV:** đảm bảo doc đủ chi tiết để PM làm theo step-by-step không cần hỏi lại — gồm: tạo Supabase user, cấp password ban đầu, set `is_manager` HOẶC `ALLOWED_MANAGER_EMAILS`, screenshot UI nếu cần thiết.
 
 ## Branch
 feat/A-doc-sync
@@ -74,6 +80,8 @@ Push PR `feat/A-doc-sync` + Report theo .cursorrules §11. ĐỪNG merge. ĐỪN
 ```
 Bắt đầu Block M — Ứng viên 1: Approval cấp 2+3 xe ngoài email-link.
 
+ACTION: Đọc TOÀN BỘ file trong Context trước. Sau khi đọc xong, tóm tắt 3-5 câu về hiểu biết của em (pattern HMAC token hiện tại ra sao, approveBooking flow đã làm gì, atomic guard hoạt động ra sao). RỒI MỚI implement. KHÔNG code trước khi đọc.
+
 ## Context
 Đọc trước:
 - docs/ROADMAP.md §3 Tuần 1 Block M
@@ -90,7 +98,7 @@ Bắt đầu Block M — Ứng viên 1: Approval cấp 2+3 xe ngoài email-link.
 - [ ] M.1 Mở rộng src/lib/tokens.ts: signApprovalToken(bookingId, level, approverEmail, exp) + verifyApprovalToken
 - [ ] M.2 Email template buildApprovalRequestEmail — thêm 2 button [Duyệt cấp N] / [Không duyệt cấp N] với HMAC URL (VML cho Outlook)
 - [ ] M.3 Page src/app/approval-response/page.tsx (public): query params action/booking_id/level/token → render screen confirm
-- [ ] M.4 API src/app/api/approval-response/route.ts: verify token + check level đúng + atomic update (.eq('status', expectedStatus).eq('current_approval_level', level))
+- [ ] M.4 API src/app/api/approval-response/route.ts: verify token + check level đúng + atomic update. **TRƯỚC khi viết:** đọc kỹ `approveBooking()` trong `src/lib/actions.ts:109-180` để copy logic state machine. Pattern atomic guard tại line 161: `.eq('status', expectedStatus[level]).eq('current_approval_level', level)`. Map status tại line 129: `{1: 'cho_duyet', 2: 'cho_duyet_cap2', 3: 'cho_duyet_cap3'}`. Sau cấp 3 → `da_duyet`. KHÔNG tự bịa state machine — copy chuẩn.
 - [ ] M.5 src/lib/supabase/middleware.ts — thêm /approval-response và /api/approval-response vào publicPaths
 - [ ] M.6 Test E2E: tạo booking xe ngoài → đợi email cấp 2 → bấm link → trang web → confirm → status đổi sang cho_duyet_cap3
 
@@ -116,6 +124,8 @@ Push PR `feat/M-approval-email-link` + Report theo .cursorrules §11 + screensho
 ```
 Bắt đầu Block C — KPI cứng API cho doc V2.2 Phiếu 4.
 
+ACTION: Đọc TOÀN BỘ file trong Context trước. Sau khi đọc xong, tóm tắt 3-5 câu (5 metric tính ra sao, sign convention của departure_diff_minutes, schema post_trips/post_trip_costs/vehicles dùng cột nào). RỒI MỚI implement. KHÔNG code trước khi đọc.
+
 ## Context
 Đọc trước:
 - docs/ROADMAP.md §3 Tuần 1 Block C
@@ -140,7 +150,7 @@ feat/C-kpi-api
 ## Đặc biệt lưu ý
 - Block này phụ thuộc Block B đã cutover (có data thật). Nếu B chưa xong → test với data dummy seed trước.
 - Score mapping theo doc §6.6: 1.0-1.9 → score 1; 2.0-2.9 → score 2; 3.0-3.9 → score 3; 4.0-4.4 → score 4; 4.5-5.0 → score 5.
-- Late pickup threshold: 5 phút (departure_diff_minutes < -5 → trễ). Confirm với PM nếu không chắc.
+- Late pickup threshold: 5 phút. **Sign convention** (verify trong `supabase/migrations/001_initial_schema.sql` trigger `compute_post_trip_diffs`): `departure_diff_minutes = actual_departure - expected_pickup_time`. Dương = đến muộn (trễ); Âm = đến sớm. Vậy: `departure_diff_minutes > 5 → trễ` (KHÔNG phải `< -5` — sai). On-time: `BETWEEN -5 AND 5`.
 - Maintenance on time: vehicles.next_maintenance_date >= today → on time. Nếu next_maintenance_date NULL → exclude khỏi tính.
 - Fleet cost vs prev month: tính từ post_trip_costs.amount group by month. Tài xế trong team Khanh (drivers.team_lead_email = 'khanh@esuhai.com' — VERIFY email chính xác với PM).
 - Format trả về JSON đúng schema trong ROADMAP §6. Đặc biệt field "note" cho metric chưa tính được (team_avg_kpi).

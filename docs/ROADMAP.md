@@ -62,7 +62,7 @@ Mỗi Block có DoD rõ. Tick checkbox khi xong. Trễ thì dời sang tuần sa
 - [ ] A.3 Tạo `docs/RUNBOOKS.md` với 4 runbook: cấp password, reset password, gỡ quyền, restore data
 - [ ] A.4 Viết lại `README.md` (bỏ boilerplate Next.js)
 - [ ] A.5 Cập nhật `BACKLOG.md` — tick P0/P1 đã fix
-- [ ] A.6 `git add docs/NHAT_TRINH_SWABB_PHAM_HONG_KHANH_TB_TAI_XE_V2.2.md` (đang untracked)
+- [x] A.6 `git add docs/NHAT_TRINH_SWABB_PHAM_HONG_KHANH_TB_TAI_XE_V2.2.md` — **Done in commit `b3a021b` (2026-05-12)**
 
 **DoD:** Onboard 1 user test theo doc mới → vào được dashboard + bấm Duyệt được.
 
@@ -312,8 +312,8 @@ Auth: requireManagerRole()
 ```
 
 ### Mapping logic
-- `late_pickup_count`: `COUNT(post_trips WHERE departure_diff_minutes < -5 AND driver IN team)` — score: 5 nếu 0, giảm 1 mỗi 1 lần trễ
-- `on_time_rate_pct`: `COUNT(diff BETWEEN -5 AND 5) / total × 100` — score theo bảng QCD doc §6.6
+- `late_pickup_count`: `COUNT(post_trips WHERE departure_diff_minutes > 5 AND driver IN team)` — score: 5 nếu 0, giảm 1 mỗi 1 lần trễ. **Sign convention:** `departure_diff_minutes = actual_departure - expected_pickup_time` (xem trigger `compute_post_trip_diffs` trong `migrations/001_initial_schema.sql`). Dương → đến muộn (trễ); Âm → đến sớm.
+- `on_time_rate_pct`: `COUNT(post_trips WHERE departure_diff_minutes BETWEEN -5 AND 5) / total × 100` — score theo bảng QCD doc §6.6. Window ±5 phút quanh giờ dự kiến = đúng giờ.
 - `maintenance_on_time_pct`: `COUNT(vehicles WHERE next_maintenance_date >= today) / total × 100`
 - `fleet_cost_vs_prev_month_pct`: `(SUM_this - SUM_prev) / SUM_prev × 100` từ `post_trip_costs`
 - `team_avg_kpi`: NULL cho đến khi mở rộng evaluate cho 7 tài xế
