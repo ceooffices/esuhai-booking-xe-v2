@@ -1,0 +1,52 @@
+name: CI
+
+# Chạy trên mỗi push lên master + mỗi pull request → catch lỗi trước khi
+# Vercel auto-deploy. Vercel deploy dù CI fail vẫn chạy (Vercel integration
+# độc lập), nhưng commit có CI failure sẽ có badge ❌ trên GitHub.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Tránh chạy parallel cùng commit (cancel job cũ khi push lại nhanh)
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint · Typecheck · Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Type check (tsc --noEmit)
+        run: npx tsc --noEmit
+
+      - name: Build (next build)
+        run: npm run build
+        env:
+          # Placeholder env cho build — KHÔNG dùng credential thật.
+          # Supabase client init chỉ runtime nên placeholder OK cho build.
+          # Vercel deploy thật sẽ inject env vars production.
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build
+          NEXT_PUBLIC_APP_URL: https://placeholder.vercel.app
+          # SMTP/secret env không cần cho build (chỉ runtime)
