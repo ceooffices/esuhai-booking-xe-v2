@@ -40,3 +40,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ─── V1 → V2 cutover artifacts ───
+# PII + sensitive data — KHÔNG commit lên GitHub
+/v1-export.csv
+/GAS_Scripts__V1.gs
+
+# One-off admin scripts (có hardcoded service_role_key — KHÔNG commit)
+# Xoá hoặc refactor sang đọc env (như scripts/seed.ts) khi không cần nữa
+/scripts/*.mjs
