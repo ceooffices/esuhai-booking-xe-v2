@@ -14,7 +14,7 @@ import 'server-only';
 import type { createAdminClient } from '@/lib/supabase/admin';
 import { sendEmail } from '@/lib/email';
 import { buildApprovalRequestEmail } from '@/lib/email-templates';
-import { signDriverToken } from '@/lib/tokens';
+import { signApprovalToken, signDriverToken } from '@/lib/tokens';
 import { lookupStaffByEmail, lookupStaffByName } from '@/lib/staff';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
@@ -108,6 +108,11 @@ export async function logEmail(
 // Gửi email "Chờ duyệt cấp N" cho approver_lN_email cấu hình trong
 // system_config. Nếu chưa cấu hình → log warning + skip (không throw).
 // Tự lookup tên/giới tính approver từ staff table để xưng hô đúng.
+//
+// Block M: kèm 2 button HMAC [Duyệt cấp N] / [Không duyệt cấp N] để
+// approver duyệt từ điện thoại không cần login dashboard. Token ràng buộc
+// (bookingId, level, approverEmail) — TTL 7 ngày. Approver cấp 2 KHÔNG
+// dùng được token cấp 3 dù cùng booking.
 export async function notifyApprover(
   supabase: AdminClient,
   bookingId: string,
@@ -124,12 +129,33 @@ export async function notifyApprover(
   if (!emailData) return;
 
   const approverInfo = await lookupStaffByEmail(approverEmail);
+
+  // Token + URL build TẠI ĐÂY (không trong getBookingEmailData) vì token
+  // ràng buộc với approverEmail cụ thể tại thời điểm gửi — không thể
+  // pre-compute trong emailData chung. TTL 7 ngày.
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://esuhai-booking-xe-v2.vercel.app';
+  let approvalApproveUrl: string | undefined;
+  let approvalRejectUrl: string | undefined;
+  try {
+    const token = signApprovalToken(bookingId, level, approverEmail);
+    const baseParams = `booking_id=${encodeURIComponent(bookingId)}&level=${level}&token=${encodeURIComponent(token)}`;
+    approvalApproveUrl = `${appUrl}/approval-response?action=approve&${baseParams}`;
+    approvalRejectUrl = `${appUrl}/approval-response?action=reject&${baseParams}`;
+  } catch (e) {
+    // signApprovalToken throw nếu WEBHOOK_SECRET không set. Fallback:
+    // gửi email cũ chỉ có link dashboard, không kèm 2 button HMAC. Log
+    // để biết phải set env.
+    console.error(`[approval] signApprovalToken FAIL cho booking ${bookingId} cấp ${level} — gửi fallback chỉ có link dashboard:`, e);
+  }
+
   const tpl = buildApprovalRequestEmail({
     ...emailData,
     approverLevel: level,
     approverName: approverInfo?.name || '',
     approverGender: approverInfo?.gender || undefined,
     totalLevels,
+    approvalApproveUrl,
+    approvalRejectUrl,
   });
   const result = await sendEmail({
     to: approverEmail,
