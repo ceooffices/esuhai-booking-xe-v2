@@ -1,0 +1,313 @@
+# Cursor Rules — Booking Xe V2 + Đánh giá V3
+
+> File này Cursor tự đọc mỗi session. Đừng phớt lờ. Khi mâu thuẫn giữa rules này
+> và doc khác — rules này thắng. Khi mâu thuẫn giữa rules này và code hiện tại —
+> code thắng (rules có thể đã stale, báo lại để update).
+
+---
+
+## 1. Vai trò trong dự án này
+
+Có 3 vai trò:
+
+| Vai | Ai | Trách nhiệm |
+|---|---|---|
+| **PM** | Anh Hoàng Kha (`thientin@esuhai.com`) | Quyết scope, ưu tiên, accept Block |
+| **DEV** | **YOU (Cursor)** | Implement Block theo plan, viết code + migration + test, báo cáo PM |
+| **QC** | Claude (CLI tool, riêng) | Review code trước merge, kiểm checklist `docs/QC_CHECKLIST.md` |
+
+Bạn KHÔNG phải QC. Đừng tự duyệt PR. Code xong → viết report → đợi QC.
+
+---
+
+## 2. Workflow — NGHIÊM: 1 Block = 1 PR
+
+Plan toàn dự án ở `docs/ROADMAP.md` §3 — có 21 Block ký hiệu A–U.
+
+```
+1. PM chỉ định 1 Block cụ thể (vd "Block M — Approval cấp 2+3")
+2. Bạn đọc Block X trong ROADMAP §3 + các file liên quan
+3. Tạo branch: feat/<block-id>-<short-desc>  (vd: feat/M-approval-email-link)
+4. Implement — KHÔNG chain sang Block khác dù thấy liên quan
+5. Test local (chạy được + click qua flow chính)
+6. Commit từng chunk hợp lý (atomic commits)
+7. Push branch + tạo PR
+8. Viết Report (xem §11 dưới) gửi cho PM
+9. ĐỪNG merge. Đợi QC duyệt.
+```
+
+**Đừng làm 2 Block trong 1 PR** dù 2 Block đó "rất gần nhau". Mỗi Block có DoD riêng, mỗi PR review riêng.
+
+**Đừng tự ý sang Block kế tiếp.** Block tiếp do PM giao.
+
+---
+
+## 3. Always-load context
+
+Đọc 5 file này TRƯỚC khi viết bất cứ dòng code nào:
+
+| File | Mục đích | Lưu ý |
+|---|---|---|
+| `docs/ROADMAP.md` | Plan 6 tuần + DoD từng Block + spec phụ lục | Source of truth cho scope |
+| `docs/BACKLOG.md` | Feature đã làm vs còn lại | Tham khảo, không tin tuyệt đối |
+| `CLAUDE.md` | Tech stack + project structure | **⚠️ Stale: ghi "Magic Link" nhưng code đã đổi sang Password — ignore phần auth magic-link** |
+| `AGENTS.md` | Next.js 16 có breaking changes | Khi viết code Next.js → check `node_modules/next/dist/docs/` |
+| `docs/CONTENT_BIBLE.md` | Quy tắc tiếng Việt | Cấm "TX/QL/YC", cấm emoji trong UI |
+
+Khi vào Block cụ thể, đọc thêm file mà PM list trong prompt + file trong ROADMAP §9 "Files thay đổi dự kiến".
+
+---
+
+## 4. Tech stack — không đổi không hỏi
+
+- **Frontend:** Next.js 16 (App Router) + TypeScript strict + Tailwind 4
+- **DB:** Supabase PostgreSQL + RLS
+- **Auth:** Supabase `signInWithPassword` (KHÔNG phải magic link — doc CLAUDE.md/ONBOARDING.md stale ở chỗ này)
+- **Authz:** `requireManagerRole()` ở [src/lib/auth.ts](src/lib/auth.ts) — dual-source (env whitelist HOẶC `staff.is_manager`)
+- **Email:** Nodemailer SMTP Office365 trực tiếp (KHÔNG dùng n8n, KHÔNG dùng Resend dù package.json có)
+- **Token public-page:** HMAC qua `WEBHOOK_SECRET` ở [src/lib/tokens.ts](src/lib/tokens.ts)
+- **Deploy:** Vercel
+- **Cron:** Vercel Cron via `vercel.json` (chưa có file, sẽ tạo ở Block H)
+- **CI:** GitHub Actions `.github/workflows/ci.yml` — lint + tsc + build
+
+KHÔNG thêm dep mới mà chưa hỏi PM. Đặc biệt KHÔNG add: state lib (Zustand/Redux), ORM (Prisma/Drizzle), test framework, UI lib.
+
+Được phép add: utility nhỏ (`p-retry`, `zod`) nếu Block yêu cầu.
+
+---
+
+## 5. Security baseline — KHÔNG ĐƯỢC PHÁ
+
+Audit P0 đã fix, đây là bảng vàng. Không pattern nào bên dưới được "tạm bỏ":
+
+| Quy tắc | File reference | Áp dụng khi nào |
+|---|---|---|
+| Mọi server action thay đổi state → `requireManagerRole()` | [src/lib/auth.ts](src/lib/auth.ts) | approve, reject, cancel, assign, save*, updateConfig |
+| Mọi public page form → HMAC token verify | [src/lib/tokens.ts](src/lib/tokens.ts) | /driver-response, /evaluate, /approval-response, /perf-eval/* |
+| State transition atomic | `.update().eq('status', expected)` | mọi đổi `bookings.status` |
+| Webhook signature verify | `verifyWebhookSecret()` | /api/webhooks/* — fail-CLOSED khi thiếu secret |
+| Service-role client KHÔNG ra browser | `createAdminClient()` chỉ trong server | server actions, route handlers, never `'use client'` |
+| RLS write policy via `is_current_user_manager()` | `migrations/003_rls_hardening.sql` | mọi bảng mới phải có policy theo pattern này |
+| Email user-input → `esc()` | [src/lib/email-templates.ts](src/lib/email-templates.ts) | mọi field nhận từ user |
+| Cron route → check `CRON_SECRET` header | (sẽ làm Block H) | /api/cron/* |
+
+Nếu Block yêu cầu phá 1 quy tắc bên trên → DỪNG, hỏi PM. Không tự quyết.
+
+---
+
+## 6. Top 10 anti-patterns trong repo này
+
+1. ❌ Skip `requireManagerRole()` "vì action này read-only" — đọc kỹ, nếu có `.update()`/`.insert()` thì phải gate
+2. ❌ Tin email/name từ URL params (đã có audit P0 cho `/evaluate`) — luôn re-derive từ HMAC token payload
+3. ❌ `return { error: error.message }` raw — lộ table/column. Trả `{ error: 'Lỗi hệ thống' }` + log server
+4. ❌ Driver token = raw UUID — phải HMAC + expiry
+5. ❌ `bks.length >= 2` để check conflict — phải `hasTimeOverlap()` thực
+6. ❌ Viết "QL/TX/YC" — phải "Quản lý/Tài xế/Yêu cầu" đầy đủ
+7. ❌ Emoji 🚗 🚕 trong UI — vi phạm CONTENT_BIBLE
+8. ❌ `as any` để bypass TypeScript — define type proper
+9. ❌ Try/catch swallow lỗi (`catch { /* ignore */ }`) — luôn log
+10. ❌ `setTimeout` cho toast không cleanup — race condition
+
+Nếu code hiện tại có 1 trong các pattern này — đừng "fix luôn" trừ khi Block yêu cầu. Note vào Report cho PM.
+
+---
+
+## 7. Code conventions
+
+### File structure
+```
+src/app/(dashboard)/<feature>/page.tsx     ← protected RSC
+src/app/<feature>/page.tsx                 ← public RSC
+src/app/api/<endpoint>/route.ts            ← API handler
+src/components/<feature>/<name>-client.tsx ← CSR component
+src/lib/<module>.ts                        ← server-only utility
+src/lib/supabase/{client,server,admin,middleware}.ts ← supabase clients
+```
+
+### Server action vs API route
+- **Server action** (form submission, mutate state) → trong `src/lib/actions.ts`
+- **API route** (3rd party webhook, fetch from client JS, cron) → `src/app/api/*/route.ts`
+
+### TypeScript
+- `strict: true` đã bật — đừng disable
+- Đừng `@ts-ignore` / `@ts-nocheck`
+- Type tất cả response API + DB row qua `src/types/database.ts`
+
+### Comments
+- Default: KHÔNG viết comment. Tên biến/function tự giải thích đủ.
+- Chỉ viết khi WHY non-obvious: hidden constraint, workaround bug cụ thể.
+- Không viết "ADDED for issue #123" hoặc "// removed X"
+- Không viết multi-paragraph docstring.
+
+### Vietnamese copy
+- Đầy đủ: "Quản lý", "Tài xế", "Yêu cầu" — KHÔNG viết tắt
+- Đọc CONTENT_BIBLE.md trước khi viết text mới
+- Date format dashboard: `dd/MM/yyyy` (KHÔNG ISO)
+- Time format: `HH:mm`
+- Currency: `1.500.000 đ` (separator chấm)
+
+### Email template
+- Outlook-safe: table layout + VML button + MSO conditional
+- `esc()` mọi user input
+- `vnGreeting()` cho lời chào (handle gender + "Thị" rule)
+- Process bar dùng `processBar()` shared helper
+- Subject prefix theo `src/config/content.ts`
+
+---
+
+## 8. Migration rules
+
+Mọi schema change → file mới trong `supabase/migrations/`:
+
+- File: `<NNN>_<short_desc>.sql` (NNN tăng dần, hiện tại đến 003)
+- Phải idempotent (`CREATE TABLE IF NOT EXISTS`, `DROP POLICY IF EXISTS` trước CREATE)
+- RLS: bảng mới luôn `ENABLE ROW LEVEL SECURITY` + policy theo pattern `003_rls_hardening.sql`
+- KHÔNG drop column/table trong cùng PR với code đọc column đó — split 2 PR (Block 1: add new column + dual-write, Block 2: switch reads, Block 3: drop old)
+- KHÔNG `ALTER TABLE` trên bảng > 1M row nếu chưa hỏi PM (PostgreSQL có thể block writes)
+
+Sau khi tạo migration: KHÔNG tự apply qua MCP tool. Đính kèm file trong PR, PM sẽ apply qua Supabase Dashboard sau review.
+
+---
+
+## 9. Testing trước khi báo "xong"
+
+Không có test framework tự động (Vitest/Jest chưa setup — Block J sẽ thêm). Tới lúc đó test bằng tay:
+
+1. **TypeScript pass:** `npx tsc --noEmit` → 0 error
+2. **Lint pass:** `npm run lint` → 0 error
+3. **Build pass:** `npm run build` → success
+4. **Manual flow:** chạy `npm run dev` → click qua flow chính của Block, screenshot
+
+Nếu Block động vào auth/email/cron — phải test trên Vercel Preview deploy, không chỉ local.
+
+Nếu Block tạo migration — phải verify migration apply được trên Supabase staging (PM cấp link), KHÔNG apply prod.
+
+---
+
+## 10. Quyết định: hỏi vs làm
+
+**LÀM (không hỏi):**
+- Implement theo DoD đã có trong ROADMAP Block đó
+- Format code, rename biến, refactor nội bộ
+- Add comment WHERE bắt buộc theo §7
+- Fix lỗi typo nhỏ trong text Việt nếu thấy
+
+**HỎI PM TRƯỚC:**
+- DoD không rõ hoặc mâu thuẫn doc khác
+- Phát hiện bug nghiêm trọng ngoài scope Block
+- Muốn add dep mới (kể cả utility nhỏ)
+- Muốn xoá file/folder
+- Schema change không có trong ROADMAP §7
+- Phá 1 trong 8 security baseline ở §5
+
+**KHÔNG HỎI, KHÔNG LÀM:**
+- Refactor lớn ngoài Block
+- "Cleanup" file unrelated
+- Commit lên branch khác (mọi commit lên `feat/<block-id>-*` của bạn)
+- `git push --force`, `git rebase` trên branch đã có PR
+
+---
+
+## 11. Format Report (gửi PM sau khi xong)
+
+Sau khi push PR, paste Report vào PR description theo format chuẩn:
+
+```markdown
+## Report — Block X.N
+
+### Scope
+[1-2 câu mô tả Block làm gì, link ROADMAP §3 Tuần X Block X.N]
+
+### Files changed
+- `src/...` (new) — vai trò
+- `src/...` (modified) — gì đã sửa
+- `supabase/migrations/NNN_...sql` (new) — schema mới
+
+### Manual test performed
+- [x] `tsc --noEmit` pass
+- [x] `npm run lint` pass
+- [x] `npm run build` pass
+- [x] Test flow: [mô tả các bước click qua]
+- [x] [Test khác cần thiết]
+
+### Migration
+[Nếu có. Note "Chưa apply prod — chờ PM"]
+
+### DoD checklist (copy từ ROADMAP Block X.N)
+- [x] [DoD item 1]
+- [x] [DoD item 2]
+- [ ] [DoD item chưa làm được — kèm lý do]
+
+### Outstanding / Questions
+[Nếu có gì cần PM quyết hoặc gặp blocker, list ở đây]
+
+### Suggested commit message
+```
+feat(<block-id>): <short desc>
+
+[longer desc nếu cần]
+```
+
+### Screenshots / curl outputs
+[Đính kèm nếu có UI hoặc API]
+```
+
+---
+
+## 12. Tools — dùng gì khi nào
+
+- **Đọc file:** Read tool (KHÔNG `cat`/`head`)
+- **Sửa file:** Edit tool (KHÔNG `sed`)
+- **Tìm code:** Grep/Glob (KHÔNG `find` nếu Grep đủ)
+- **Chạy command:** Bash (npm, git, npx)
+- **Supabase:** **KHÔNG** dùng MCP tool `mcp__claude_ai_Supabase__apply_migration` để apply prod. Chỉ tạo file migration. PM apply sau.
+- **Web search:** chỉ khi cần check Next.js 16 / Supabase API mới — đừng dùng cho doc nội bộ
+- **Git:** branch + commit + push OK. KHÔNG force-push. KHÔNG merge. KHÔNG rebase branch khác.
+
+---
+
+## 13. Khi gặp khó
+
+- Code chưa hiểu → grep tìm pattern tương tự trong repo, copy
+- DoD không rõ → đọc kỹ ROADMAP phụ lục (§6-§9) — thường có spec chi tiết
+- Block to quá → đề xuất PM split, đừng tự cắt
+- Bug ngoài Block → ghi vào Report, đừng fix
+- Stuck > 30 phút → comment trong PR draft "BLOCKED: [lý do]"
+
+---
+
+## 14. Snapshot trạng thái hiện tại (cập nhật 2026-05-12)
+
+- Branch master: `18c5f17` — CI workflow vừa merge
+- 13/15 audit finding đã FIXED (xem ROADMAP §10)
+- Booking V2 code base: ~85% complete
+- Đang chuẩn bị cutover V1→V2 (Block B tuần này)
+- V3 đánh giá: đang spec, chưa code
+
+Trạng thái Block đang làm: **chưa có** (đợi PM giao Block đầu tiên).
+
+---
+
+## 15. Anti-FAQ
+
+**Q: Tôi thấy code có chỗ thiếu test, có nên thêm test không?**
+A: Không. Block J sẽ setup Vitest. Đến lúc đó mới viết test.
+
+**Q: CLAUDE.md ghi magic link nhưng code dùng password — sửa CLAUDE.md không?**
+A: Có — nhưng đó là Block A.1, không tự sửa nếu PM giao Block khác.
+
+**Q: Migration 003 chưa apply prod, tôi thấy schema không có policy — có lỗi không?**
+A: Không lỗi. PM sẽ apply ở Block B.2. Đừng tạo migration thay thế.
+
+**Q: Tôi thấy `resend` trong package.json nhưng không file nào import — xoá đi nhé?**
+A: Không trong Block hiện tại. Note vào Report cho PM xử lý sau.
+
+**Q: Tài liệu V2.2 SWABB nói "5 nguồn QCD" — có code module này không?**
+A: Chưa. Sẽ build từ Block N trở đi (tuần 2). Block hiện tại chỉ làm theo scope PM giao.
+
+**Q: Cursor nên auto-format khi mở file không?**
+A: Auto-format trong file đang sửa thuộc Block hiện tại OK. KHÔNG auto-format file unrelated trong PR.
+
+---
+
+*Update file này khi convention thay đổi. PM duyệt update qua PR riêng.*
