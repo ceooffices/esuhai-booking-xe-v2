@@ -12,6 +12,7 @@ import {
   buildRejectBookerEmail,
   buildCancellationEmail,
   buildRejectAllEmail,
+  buildApprovalRequestEmail,
 } from '@/lib/email-templates';
 
 const SAMPLE = {
@@ -59,6 +60,34 @@ const TEMPLATES = [
     name: '1. Yêu cầu mới → Quản lý',
     color: '#2563eb',
     build: () => buildNewBookingEmail(SAMPLE),
+  },
+  {
+    id: 'approval_l2_email_link',
+    name: '1b. Chờ duyệt cấp 2 (email-link, Block M)',
+    color: '#2563eb',
+    build: () => buildApprovalRequestEmail({
+      ...SAMPLE,
+      approverLevel: 2,
+      approverName: 'LÊ THỊ THÚY HÀ',
+      approverGender: 'female' as const,
+      totalLevels: 3,
+      approvalApproveUrl: '#sample-approve-l2',
+      approvalRejectUrl: '#sample-reject-l2',
+    }),
+  },
+  {
+    id: 'approval_l3_email_link',
+    name: '1c. Chờ duyệt cấp 3 (email-link, Block M)',
+    color: '#16a34a',
+    build: () => buildApprovalRequestEmail({
+      ...SAMPLE,
+      approverLevel: 3,
+      approverName: 'NGUYỄN MINH CHÍNH',
+      approverGender: 'male' as const,
+      totalLevels: 3,
+      approvalApproveUrl: '#sample-approve-l3',
+      approvalRejectUrl: '#sample-reject-l3',
+    }),
   },
   {
     id: 'driver_assign',

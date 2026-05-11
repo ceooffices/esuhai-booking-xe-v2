@@ -40,6 +40,8 @@ export async function updateSession(request: NextRequest) {
     '/login',
     '/driver-response',
     '/api/driver-response',
+    '/approval-response',
+    '/api/approval-response',
     '/evaluate',
     '/api/webhooks',
     '/api/auth/callback',

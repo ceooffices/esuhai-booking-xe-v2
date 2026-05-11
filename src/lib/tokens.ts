@@ -1,11 +1,12 @@
 // ============================================================
-// HMAC-signed tokens — dùng cho /evaluate, /driver-response
+// HMAC-signed tokens — dùng cho /evaluate, /driver-response, /approval-response
 // Ký bằng WEBHOOK_SECRET (env), verify constant-time.
 //
 // Format token: "{base64url(payload)}.{base64url(hmacSha256)}"
 // Payload là plaintext có cấu trúc:
-//   eval:{bookingId}:{evaluatorEmail}        — đánh giá chuyến
-//   drv:{bookingId}:{driverId}:{expiresEpoch} — phản hồi tài xế
+//   eval:{bookingId}:{evaluatorEmail}                              — đánh giá chuyến
+//   drv:{bookingId}:{driverId}:{expiresEpoch}                      — phản hồi tài xế
+//   approve:{bookingId}:{level}:{approverEmail}:{expiresEpoch}     — duyệt/không duyệt cấp N
 // ============================================================
 
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -103,4 +104,54 @@ export function verifyDriverToken(token: string | null | undefined, bookingId: s
   if (!exp || isNaN(exp)) return { valid: false };
   if (Math.floor(Date.now() / 1000) > exp) return { valid: true, expired: true };
   return { valid: true };
+}
+
+// ============================================================
+// APPROVAL TOKEN — duyệt/không duyệt cấp N từ email-link (/approval-response)
+// TTL mặc định 7 ngày kể từ lúc gửi email "Chờ duyệt cấp N".
+// Mỗi token ràng buộc với (bookingId, level, approverEmail) cụ thể —
+// approver cấp 2 KHÔNG dùng được token cấp 3 dù cùng booking.
+// ============================================================
+
+export type ApprovalLevel = 1 | 2 | 3;
+
+export interface ApprovalTokenPayload {
+  bookingId: string;
+  level: ApprovalLevel;
+  approverEmail: string;
+}
+
+export interface ApprovalTokenResult {
+  valid: boolean;
+  expired?: boolean;
+  payload?: ApprovalTokenPayload;
+}
+
+export function signApprovalToken(
+  bookingId: string,
+  level: ApprovalLevel,
+  approverEmail: string,
+  ttlSeconds: number = 7 * 86400
+): string {
+  const exp = Math.floor(Date.now() / 1000) + ttlSeconds;
+  return signToken(`approve:${bookingId}:${level}:${approverEmail.toLowerCase()}:${exp}`);
+}
+
+export function verifyApprovalToken(token: string | null | undefined): ApprovalTokenResult {
+  const payload = verifyToken(token);
+  if (!payload) return { valid: false };
+  const parts = payload.split(':');
+  if (parts.length !== 5 || parts[0] !== 'approve') return { valid: false };
+  const [, bookingId, levelStr, approverEmail, expStr] = parts;
+  const levelNum = parseInt(levelStr, 10);
+  const exp = parseInt(expStr, 10);
+  if (!bookingId || !approverEmail || !exp || isNaN(exp)) return { valid: false };
+  if (levelNum !== 1 && levelNum !== 2 && levelNum !== 3) return { valid: false };
+  const result: ApprovalTokenPayload = {
+    bookingId,
+    level: levelNum as ApprovalLevel,
+    approverEmail,
+  };
+  if (Math.floor(Date.now() / 1000) > exp) return { valid: true, expired: true, payload: result };
+  return { valid: true, payload: result };
 }
