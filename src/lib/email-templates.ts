@@ -450,6 +450,42 @@ function dualActionRow(confirmUrl: string, rejectUrl: string): string {
 </td></tr>`;
 }
 
+// Dual action cho approval cấp N: Duyệt cấp N (xanh lá VML) + Không duyệt cấp N (đỏ viền)
+// VML cho Outlook desktop, fallback flex cho Gmail/mobile.
+function approvalActionRow(approveUrl: string, rejectUrl: string, level: 1 | 2 | 3): string {
+  const approveText = `Duyệt cấp ${level}`;
+  const rejectText = `Không duyệt cấp ${level}`;
+  return `
+<tr><td bgcolor="#ffffff" align="center" style="background-color:#ffffff;padding:8px 40px 24px;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+<table role="presentation" border="0" cellspacing="0" cellpadding="0" width="100%">
+<tr>
+<!--[if mso]>
+<td width="270" align="center" valign="middle" style="padding-right:8px;">
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${approveUrl}" style="height:50px;v-text-anchor:middle;width:260px;" arcsize="10%" strokecolor="${GREEN}" fillcolor="${GREEN}">
+<w:anchorlock/>
+<center style="color:#ffffff;font-family:${F};font-size:15px;font-weight:bold;">${approveText}</center>
+</v:roundrect>
+</td>
+<![endif]-->
+<!--[if !mso]><!--><td width="50%" align="center" valign="middle" style="padding-right:8px;">
+<a href="${approveUrl}" style="display:block;background-color:${GREEN};color:#ffffff;padding:16px 12px;border-radius:10px;text-decoration:none;font-size:15px;font-family:${F};font-weight:700;text-align:center;box-shadow:0 2px 6px rgba(22,163,106,0.3);">${approveText}</a>
+</td><!--<![endif]-->
+<!--[if mso]>
+<td width="270" align="center" valign="middle" style="padding-left:8px;">
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${rejectUrl}" style="height:50px;v-text-anchor:middle;width:260px;" arcsize="10%" strokecolor="${RED}" fillcolor="#ffffff">
+<w:anchorlock/>
+<center style="color:${RED};font-family:${F};font-size:14px;font-weight:bold;">${rejectText}</center>
+</v:roundrect>
+</td>
+<![endif]-->
+<!--[if !mso]><!--><td width="50%" align="center" valign="middle" style="padding-left:8px;">
+<a href="${rejectUrl}" style="display:block;background:#ffffff;color:${RED};padding:14px 12px;border-radius:10px;text-decoration:none;font-size:15px;font-family:${F};font-weight:600;text-align:center;border:2px solid ${RED};">${rejectText}</a>
+</td><!--<![endif]-->
+</tr>
+</table>
+</td></tr>`;
+}
+
 // Calendar link nhỏ gọn với icon
 function calendarInlineRow(title: string, date: string, startTime: string, endTime?: string, location?: string): string {
   const dateClean = date.replace(/-/g, '');
@@ -658,6 +694,11 @@ export function buildApprovalRequestEmail(d: BookingEmailData & {
   approverName?: string;
   approverGender?: 'male' | 'female';
   totalLevels: number; // 1 cho xe cơ hữu, 3 cho xe ngoài
+  // Optional: nếu truyền → email kèm 2 button HMAC để duyệt/không duyệt từ
+  // điện thoại không cần login dashboard (Block M). Bỏ qua → email cũ chỉ
+  // có link "Mở bảng điều phối".
+  approvalApproveUrl?: string;
+  approvalRejectUrl?: string;
 }): { subject: string; html: string } {
   const subject = d.approverLevel === 1
     ? `[Yêu cầu xe mới — cần duyệt] ${d.purpose} — ${d.tripDate}`
@@ -702,7 +743,16 @@ export function buildApprovalRequestEmail(d: BookingEmailData & {
       { label: 'Thành viên', value: d.memberNames ? esc(d.memberNames) : '' },
     ]),
     d.itinerary ? timelineRow(d.itinerary) : '',
-    d.dashboardUrl ? ctaButtonRow('Mở bảng điều phối — Duyệt yêu cầu', d.dashboardUrl, accentColor) : '',
+    // Ưu tiên 2 button HMAC nếu có (Block M); fallback link dashboard cho
+    // tương thích ngược (vd email-preview hoặc cấp 1 chưa wire token).
+    d.approvalApproveUrl && d.approvalRejectUrl
+      ? approvalActionRow(d.approvalApproveUrl, d.approvalRejectUrl, d.approverLevel)
+      : d.dashboardUrl ? ctaButtonRow('Mở bảng điều phối — Duyệt yêu cầu', d.dashboardUrl, accentColor) : '',
+    // Nếu đã có 2 button HMAC → vẫn show link dashboard nhỏ phụ để approver
+    // mở chi tiết khi muốn review trước khi quyết.
+    d.approvalApproveUrl && d.approvalRejectUrl && d.dashboardUrl
+      ? linkRow('Hoặc mở bảng điều phối để xem chi tiết', d.dashboardUrl)
+      : '',
     footerRow(
       d.totalLevels === 1
         ? 'Sau khi duyệt, hệ thống sẽ thông báo Phòng Tổng Hợp để phân bổ tài xế.'
