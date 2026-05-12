@@ -26,19 +26,28 @@ Plan toàn dự án ở `docs/ROADMAP.md` §3 — có 21 Block ký hiệu A–U.
 
 ```
 1. PM chỉ định 1 Block cụ thể (vd "Block M — Approval cấp 2+3")
-2. Bạn đọc Block X trong ROADMAP §3 + các file liên quan
-3. Tạo branch: feat/<block-id>-<short-desc>  (vd: feat/M-approval-email-link)
-4. Implement — KHÔNG chain sang Block khác dù thấy liên quan
-5. Test local (chạy được + click qua flow chính)
-6. Commit từng chunk hợp lý (atomic commits)
-7. Push branch + tạo PR
-8. Viết Report (xem §11 dưới) gửi cho PM
-9. ĐỪNG merge. Đợi QC duyệt.
+2. SYNC MASTER TRƯỚC: git fetch origin && git checkout master && git pull origin master --ff-only
+   ↑ Bắt buộc. Tránh fork sai base khi PM merge Block trước trong lúc bạn còn đang đọc.
+3. Đọc Block X trong ROADMAP §3 + các file liên quan
+4. Tạo branch: feat/<block-id>-<short-desc>  (vd: feat/M-approval-email-link)
+5. Implement — KHÔNG chain sang Block khác dù thấy liên quan
+6. Test local (chạy được + click qua flow chính)
+7. Commit từng chunk hợp lý (atomic commits)
+8. RE-SYNC TRƯỚC PUSH: git fetch origin && git merge origin/master --no-edit
+   ↑ Nếu master tiến triển trong lúc bạn code, merge vào branch (clean commit). KHÔNG `git rebase` branch đã có ý định push (force-push gây mất commit).
+   ↑ Nếu conflict — fix theo intent của master, không tự bịa.
+9. Push branch: git push origin feat/<block-id>-...
+10. MỞ PR — đừng quên bước này: gh pr create -B master -H feat/<block-id>-... --title "Block X — ..." --body "..."
+    ↑ Block A/M/C đều miss bước này, PM/QC phải mở thay. Bạn (DEV) phải mở.
+11. Viết Report (xem §11 dưới) PASTE VÀO PR BODY hoặc COMMENT đầu tiên
+12. ĐỪNG merge. Đợi QC duyệt.
 ```
 
 **Đừng làm 2 Block trong 1 PR** dù 2 Block đó "rất gần nhau". Mỗi Block có DoD riêng, mỗi PR review riêng.
 
 **Đừng tự ý sang Block kế tiếp.** Block tiếp do PM giao.
+
+**Bài học từ Block C (2026-05-12):** Cursor fork branch từ commit cũ trước khi A+M merge → diff PR show A+M là "deletion" → PM phải merge tay. Step 2 + 8 chống lỗi này.
 
 ---
 
