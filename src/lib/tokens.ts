@@ -1,12 +1,14 @@
 // ============================================================
-// HMAC-signed tokens — dùng cho /evaluate, /driver-response, /approval-response
+// HMAC-signed tokens — dùng cho /evaluate, /driver-response, /approval-response,
+// /perf-eval/*
 // Ký bằng WEBHOOK_SECRET (env), verify constant-time.
 //
 // Format token: "{base64url(payload)}.{base64url(hmacSha256)}"
 // Payload là plaintext có cấu trúc:
-//   eval:{bookingId}:{evaluatorEmail}                              — đánh giá chuyến
-//   drv:{bookingId}:{driverId}:{expiresEpoch}                      — phản hồi tài xế
-//   approve:{bookingId}:{level}:{approverEmail}:{expiresEpoch}     — duyệt/không duyệt cấp N
+//   eval:{bookingId}:{evaluatorEmail}                                            — đánh giá chuyến
+//   drv:{bookingId}:{driverId}:{expiresEpoch}                                    — phản hồi tài xế
+//   approve:{bookingId}:{level}:{approverEmail}:{expiresEpoch}                   — duyệt/không duyệt cấp N
+//   eval3:{role}:{evaluatorEmail}:{periodType}:{periodStart}:{expiresEpoch}      — V3 đánh giá hiệu quả (Block N)
 // ============================================================
 
 import { createHmac, timingSafeEqual } from 'crypto';
@@ -151,6 +153,106 @@ export function verifyApprovalToken(token: string | null | undefined): ApprovalT
     bookingId,
     level: levelNum as ApprovalLevel,
     approverEmail,
+  };
+  if (Math.floor(Date.now() / 1000) > exp) return { valid: true, expired: true, payload: result };
+  return { valid: true, payload: result };
+}
+
+// ============================================================
+// EVAL TOKEN V3 — Đánh giá hiệu quả 5 nguồn QCD (/perf-eval/*) — Block N
+//
+// Mỗi token ràng buộc (role, evaluatorEmail, periodType, periodStart) cụ thể.
+// Period_start làm anchor (không phải period_end) để evaluator submit cuối
+// kỳ vs đầu kỳ kế không tạo conflict trong UNIQUE composite key của
+// performance_evaluations.
+//
+// TTL mặc định lớn hơn cadence để tránh expire trong cửa sổ submit:
+//   daily=2 ngày, weekly=10 ngày, monthly=35 ngày.
+// ============================================================
+
+export type EvalRoleV3 =
+  | 'self'
+  | 'receiver_tgd'
+  | 'receiver_secretary'
+  | 'receiver_general'
+  | 'receiver_hr'
+  | 'receiver_department'
+  | 'manager_ha'
+  | 'hard_kpi'
+  | 'peer_360';
+
+export type EvalPeriodV3 = 'daily' | 'weekly' | 'monthly';
+
+const EVAL_ROLES_V3: ReadonlySet<EvalRoleV3> = new Set([
+  'self',
+  'receiver_tgd',
+  'receiver_secretary',
+  'receiver_general',
+  'receiver_hr',
+  'receiver_department',
+  'manager_ha',
+  'hard_kpi',
+  'peer_360',
+]);
+
+const EVAL_PERIODS_V3: ReadonlySet<EvalPeriodV3> = new Set(['daily', 'weekly', 'monthly']);
+
+const DEFAULT_TTL_DAYS_BY_PERIOD: Record<EvalPeriodV3, number> = {
+  daily: 2,
+  weekly: 10,
+  monthly: 35,
+};
+
+export interface EvalTokenV3Payload {
+  role: EvalRoleV3;
+  evaluatorEmail: string;
+  periodType: EvalPeriodV3;
+  periodStart: string; // YYYY-MM-DD
+}
+
+export interface EvalTokenV3Result {
+  valid: boolean;
+  expired?: boolean;
+  payload?: EvalTokenV3Payload;
+}
+
+const PERIOD_START_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+
+export function signEvalTokenV3(
+  role: EvalRoleV3,
+  evaluatorEmail: string,
+  periodType: EvalPeriodV3,
+  periodStart: string,
+  ttlDays?: number
+): string {
+  if (!EVAL_ROLES_V3.has(role)) throw new Error(`Invalid eval role: ${role}`);
+  if (!EVAL_PERIODS_V3.has(periodType)) throw new Error(`Invalid period type: ${periodType}`);
+  if (!PERIOD_START_RE.test(periodStart)) {
+    throw new Error(`Invalid period_start (cần YYYY-MM-DD): ${periodStart}`);
+  }
+  const days = ttlDays ?? DEFAULT_TTL_DAYS_BY_PERIOD[periodType];
+  const exp = Math.floor(Date.now() / 1000) + days * 86400;
+  return signToken(
+    `eval3:${role}:${evaluatorEmail.toLowerCase()}:${periodType}:${periodStart}:${exp}`
+  );
+}
+
+export function verifyEvalTokenV3(token: string | null | undefined): EvalTokenV3Result {
+  const payload = verifyToken(token);
+  if (!payload) return { valid: false };
+  const parts = payload.split(':');
+  if (parts.length !== 6 || parts[0] !== 'eval3') return { valid: false };
+  const [, roleStr, evaluatorEmail, periodTypeStr, periodStart, expStr] = parts;
+  if (!EVAL_ROLES_V3.has(roleStr as EvalRoleV3)) return { valid: false };
+  if (!EVAL_PERIODS_V3.has(periodTypeStr as EvalPeriodV3)) return { valid: false };
+  if (!PERIOD_START_RE.test(periodStart)) return { valid: false };
+  const exp = parseInt(expStr, 10);
+  if (!evaluatorEmail || !exp || isNaN(exp)) return { valid: false };
+  const result: EvalTokenV3Payload = {
+    role: roleStr as EvalRoleV3,
+    evaluatorEmail,
+    periodType: periodTypeStr as EvalPeriodV3,
+    periodStart,
   };
   if (Math.floor(Date.now() / 1000) > exp) return { valid: true, expired: true, payload: result };
   return { valid: true, payload: result };
